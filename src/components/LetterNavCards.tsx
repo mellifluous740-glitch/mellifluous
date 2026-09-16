@@ -105,17 +105,17 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-pink-600 dark:text-pink-400">
             <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
-            <span>Thư tình mùa hạ • 4 phong thư đặc biệt</span>
+            <span>Nhà Mell có gì? • Khám phá các ngóc ngách ở trong nhà</span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-stone-800 dark:text-stone-100 mt-1">
-            Những phong thư gửi đến độc giả
+            Cùng Mell mở thư nha
           </h2>
         </div>
 
         {activeLetter && (
           <div className="inline-flex items-center gap-2 text-xs text-pink-600 dark:text-pink-300 bg-pink-50 dark:bg-pink-950/60 px-3.5 py-1.5 rounded-full border border-pink-200 dark:border-pink-800/70 animate-in fade-in shadow-2xs">
             <MailOpen className="w-3.5 h-3.5 animate-pulse text-pink-500" />
-            <span className="font-medium">Đang mở phong thư bên dưới (Chạm lại để gập)</span>
+            <span className="font-medium">Đang mở thư</span>
           </div>
         )}
       </div>
