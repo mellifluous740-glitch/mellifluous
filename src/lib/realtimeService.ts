@@ -29,6 +29,32 @@ import {
   getStoryChapters,
 } from '../data/mockData';
 
+/**
+ * Recursively removes all keys with `undefined` value from objects/arrays,
+ * as Firestore strictly disallows `undefined` in documents and array elements.
+ */
+export const sanitizeForFirestore = <T>(data: T): T => {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object') {
+    if (data instanceof Date) return data;
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+};
+
 // Active memory listeners for instant UI synchronization
 const activeStorySubscribers = new Set<(stories: Story[]) => void>();
 const activeAnnouncementSubscribers = new Set<(announcements: Announcement[]) => void>();
@@ -581,7 +607,7 @@ export const postRealtimeComment = async (comment: {
 }): Promise<void> => {
   try {
     const commentsColl = collection(db, 'comments');
-    await addDoc(commentsColl, {
+    await addDoc(commentsColl, sanitizeForFirestore({
       storyId: comment.storyId,
       chapterNumber: comment.chapterNumber || null,
       chapterId: comment.chapterId || null,
@@ -598,7 +624,7 @@ export const postRealtimeComment = async (comment: {
       likedBy: [],
       replies: [],
       createdAt: new Date().toISOString(),
-    });
+    }));
 
     // Increment comment count on story_stats
     const storyDocRef = doc(db, 'story_stats', comment.storyId);
@@ -662,12 +688,18 @@ export const postCommentReply = async (
     createdAt: new Date().toISOString(),
     isAuthor: Boolean(reply.isAuthor),
     isCollaborator: Boolean(reply.isCollaborator),
-    roleBadge: reply.roleBadge || (reply.isAuthor ? 'Tác giả' : reply.isCollaborator ? 'Cộng sự' : undefined),
+    ...(reply.roleBadge
+      ? { roleBadge: reply.roleBadge }
+      : reply.isAuthor
+      ? { roleBadge: 'Tác giả' }
+      : reply.isCollaborator
+      ? { roleBadge: 'Cộng sự' }
+      : {}),
     userEmail: reply.userEmail || null,
     likes: 0,
     likedBy: [],
-    replyToUser: reply.replyToUser || undefined,
-    replyToId: reply.replyToId || undefined,
+    ...(reply.replyToUser ? { replyToUser: reply.replyToUser } : {}),
+    ...(reply.replyToId ? { replyToId: reply.replyToId } : {}),
   };
 
   try {
@@ -676,25 +708,25 @@ export const postCommentReply = async (
     if (snap.exists()) {
       const data = snap.data();
       const currentReplies: CommentReply[] = Array.isArray(data.replies) ? data.replies : [];
-      // Clean and deduplicate existing replies
+      // Clean, deduplicate and sanitize existing replies against undefined
       const seenIds = new Set<string>();
       const cleanedReplies: CommentReply[] = [];
       for (const r of currentReplies) {
         if (r && r.id && !seenIds.has(r.id) && r.id !== newReplyItem.id) {
           seenIds.add(r.id);
-          cleanedReplies.push(r);
+          cleanedReplies.push(sanitizeForFirestore(r));
         }
       }
-      cleanedReplies.push(newReplyItem);
-      await updateDoc(commentRef, {
+      cleanedReplies.push(sanitizeForFirestore(newReplyItem));
+      await updateDoc(commentRef, sanitizeForFirestore({
         replies: cleanedReplies,
         lastRepliedAt: new Date().toISOString(),
-      });
+      }));
     } else {
-      await updateDoc(commentRef, {
-        replies: arrayUnion(newReplyItem),
+      await updateDoc(commentRef, sanitizeForFirestore({
+        replies: arrayUnion(sanitizeForFirestore(newReplyItem)),
         lastRepliedAt: new Date().toISOString(),
-      });
+      }));
     }
   } catch (err) {
     console.error('Failed to post comment reply to Firestore:', err);
@@ -770,9 +802,9 @@ export const toggleReplyLike = async (
         const newLikes = Math.max(0, newLikedBy.length);
         isLikedNow = !hasLiked;
         finalLikes = newLikes;
-        updatedReplies.push({ ...r, likes: newLikes, likedBy: newLikedBy });
+        updatedReplies.push(sanitizeForFirestore({ ...r, likes: newLikes, likedBy: newLikedBy }));
       } else {
-        updatedReplies.push(r);
+        updatedReplies.push(sanitizeForFirestore(r));
       }
     }
 

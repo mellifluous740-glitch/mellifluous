@@ -273,10 +273,10 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
       avatar: isMainAuthor ? '🌸' : isCollaborator ? '🌿' : '💬',
       isAuthor: Boolean(isMainAuthor),
       isCollaborator: Boolean(isCollaborator),
-      roleBadge: isMainAuthor ? 'Tác giả' : isCollaborator ? 'Cộng sự' : undefined,
+      ...(isMainAuthor ? { roleBadge: 'Tác giả' } : isCollaborator ? { roleBadge: 'Cộng sự' } : {}),
       userEmail: user?.email || null,
-      replyToUser: replyingTarget.replyToUser,
-      replyToId: replyingTarget.replyToId,
+      ...(replyingTarget.replyToUser ? { replyToUser: replyingTarget.replyToUser } : {}),
+      ...(replyingTarget.replyToId ? { replyToId: replyingTarget.replyToId } : {}),
     };
 
     try {
