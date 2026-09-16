@@ -83,7 +83,7 @@ export const CompletedStoriesView: React.FC<CompletedStoriesViewProps> = ({
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-100/90 dark:bg-pink-950/80 text-pink-700 dark:text-pink-300 text-xs font-semibold tracking-wide">
               <CheckCircle2 className="w-4 h-4 text-pink-500" />
-              <span>KHO TÀNG TRUYỆN ĐÃ HOÀN • 100% HAPPY ENDING</span>
+              <span>TẬP THƯ ĐÃ VIẾT • HOÀN THÀNH</span>
             </div>
 
             <h1 className="font-serif text-2xl sm:text-4xl font-bold text-stone-800 dark:text-stone-100 tracking-tight">
@@ -91,7 +91,7 @@ export const CompletedStoriesView: React.FC<CompletedStoriesViewProps> = ({
             </h1>
 
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-              Trọn vẹn tình đầu, kết thúc viên mãn. Những câu chuyện đã kết thúc trọn vẹn, được biên tập kỹ lưỡng, yên tâm lọt hố thâu đêm suốt sáng mà không lo phải chờ đợi chương mới từng ngày.
+              CÁC tác phẩm đã hoàn thành, một số tác phẩm đã cập nhật Ebook. Cả nhà đừng quên bày tỏ cảm xúc bằng cách đánh giá và thả tim cho Mell nhaaa
             </p>
 
             {/* Quick Stats Pill */}
