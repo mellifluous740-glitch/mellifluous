@@ -40,7 +40,7 @@ export const HeroIntro: React.FC<HeroIntroProps> = ({
         {/* Blog Banner Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-100/90 dark:bg-pink-950/60 border border-pink-200 dark:border-pink-800/80 text-pink-800 dark:text-pink-300 text-xs font-sans font-medium shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-pink-500 animate-pulse" />
-          <span>Mùa hè • Thanh xuân • Ngôn tình thuần ngọt</span>
+          <span>Một blog nhỏ của Mell</span>
         </div>
 
         {/* Main Title of Blog: "better and better" */}
@@ -71,7 +71,8 @@ export const HeroIntro: React.FC<HeroIntroProps> = ({
 
           {/* Introduction paragraph */}
           <p className="text-sm sm:text-[15px] leading-relaxed text-stone-700 dark:text-stone-300 font-sans">
-            Đây là trang phụ của tớ, đăng linh ta linh tinh. Đăng truyện song song với trang chính, cập nhật muộn và không thường xuyên, phòng ngừa trang chính bị khóa.
+            Đây là trang web mới của tớ, tớ dự định sẽ phát triển và sử dụng lâu dài trang web này. mọi người vẫn có thể ghé qua thăm quan các căn nhà cũ của mình
+          đó nhaaa.
           </p>
 
           {/* Note in italics with special border decoration */}
@@ -79,7 +80,7 @@ export const HeroIntro: React.FC<HeroIntroProps> = ({
             <div className="flex items-start gap-2.5 text-xs sm:text-sm text-rose-800 dark:text-rose-300 bg-rose-50/70 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200/60 dark:border-rose-900/40">
               <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <p className="italic font-serif leading-relaxed">
-                Truyện trong nhà được chuyển ngữ dưới sự cho phép của tác giả với mục đích phi lợi nhuận, sẽ có mật khẩu để đảm bảo công sức của tác giả lẫn dịch giả.
+                Truyện trong nhà được chuyển ngữ với mục đích phi lợi nhuận, có tác phẩm được tác giả cho phép, có tác phẩm chưa nhận được sự đồng ý của tác giả. Mình sẽ đặt mật khẩu để đảm bảo công sức của tác giả lẫn dịch giả.
               </p>
             </div>
           </div>
@@ -94,7 +95,7 @@ export const HeroIntro: React.FC<HeroIntroProps> = ({
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-600 hover:to-amber-600 text-white font-medium text-sm shadow-md shadow-pink-500/20 hover:shadow-lg hover:shadow-pink-500/30 transition-all duration-200 flex items-center gap-2 cursor-pointer"
           >
             <Feather className="w-4 h-4" />
-            <span>Khám phá các bộ truyện</span>
+            <span>Khám phá nhà của Mell</span>
           </button>
 
           <button
@@ -104,7 +105,7 @@ export const HeroIntro: React.FC<HeroIntroProps> = ({
             className="px-4 py-2.5 rounded-xl bg-white/90 dark:bg-stone-800 hover:bg-pink-50 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-stone-700 font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer shadow-2xs"
           >
             <Heart className="w-4 h-4 text-pink-500" />
-            <span>Xem hướng dẫn giải pass</span>
+            <span>Quy định và hướng dẫn giải pass</span>
           </button>
         </div>
       </div>
