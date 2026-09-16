@@ -79,7 +79,7 @@ export const OngoingStoriesView: React.FC<OngoingStoriesViewProps> = ({
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/90 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-semibold tracking-wide">
               <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>KHU VƯỜN TRUYỆN ĐANG TIẾN HÀNH • CẬP NHẬT ĐỀU ĐẶN</span>
+              <span>TẬP THƯ ĐANG VIẾT • TIẾP DIỄN</span>
             </div>
 
             <h1 className="font-serif text-2xl sm:text-4xl font-bold text-stone-800 dark:text-stone-100 tracking-tight">
@@ -87,22 +87,18 @@ export const OngoingStoriesView: React.FC<OngoingStoriesViewProps> = ({
             </h1>
 
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-              Cùng Mel đồng hành mỗi tuần, theo dõi từng bước chân ngọt ngào của các nhân vật. Từng chương mới được chuyển ngữ tỉ mỉ, đong đầy cảm xúc mùa hạ trong từng câu chữ.
+              Mọi người cùng hóng truyện với Mell nho, Mell cũng khá bận nên mọi người đừng giục chương Mell ạ 🥺. Mọi người tiện tay thả tim và đánh giá để Mell có động lực dịch tiếp nhéee
             </p>
 
             {/* Posting Schedule Indicator */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-stone-800 text-xs font-medium text-stone-700 dark:text-stone-200 border border-emerald-200/60 dark:border-stone-700 shadow-2xs">
                 <Calendar className="w-3.5 h-3.5 text-emerald-500" />
-                Lịch ra chương: <strong>Thứ 3 • Thứ 5 • Thứ 7</strong>
+                Lịch ra chương: <strong>Không cố định</strong>
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-stone-800 text-xs font-medium text-stone-700 dark:text-stone-200 border border-emerald-200/60 dark:border-stone-700 shadow-2xs">
                 <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
                 <strong>{ongoingStories.length}</strong> dự án đang chạy
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-stone-800 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-stone-700 shadow-2xs">
-                <Flame className="w-3.5 h-3.5 text-amber-500" />
-                Đều đặn không drop
               </span>
             </div>
           </div>
@@ -114,7 +110,7 @@ export const OngoingStoriesView: React.FC<OngoingStoriesViewProps> = ({
               Updating
             </span>
             <span className="text-[10px] text-stone-500 dark:text-stone-400">
-              Mùa hè này
+              2026
             </span>
           </div>
         </div>
