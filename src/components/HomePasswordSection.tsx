@@ -57,12 +57,12 @@ export const HomePasswordSection: React.FC<HomePasswordSectionProps> = ({
     ) {
       setTestResult({
         success: true,
-        message: `🌸 Chính xác rồi nàng ơi! Mật mã của "${selectedItem.chapter.title}" hoàn toàn chuẩn xác. Chúc bạn đọc truyện vui vẻ!`,
+        message: `🌸 Đúng rùi bồ ui! Mật mã của "${selectedItem.chapter.title}" hoàn toàn chính xác. Chúc bồ đọc truyện vui vẻ nhaaa!`,
       });
     } else {
       setTestResult({
         success: false,
-        message: 'Chưa chính xác rồi. Hãy đọc lại gợi ý riêng của chương và nhớ viết thường không dấu nhé!',
+        message: '😭 Hong phải rùi. Bồ đọc kỹ lại gợi ý nhaaa!',
       });
     }
   };
@@ -86,7 +86,7 @@ export const HomePasswordSection: React.FC<HomePasswordSectionProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-amber-700 dark:text-amber-400">
-              <span>Bí kíp giải mã • Bảo vệ bản quyền phi thương mại</span>
+              <span>Cách nhận và mở thư • Bảo vệ công sức của tác giả, dịch giả</span>
             </div>
             <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-800 dark:text-stone-100">
               Gợi Ý Password & Thử Mật Khẩu
@@ -109,10 +109,10 @@ export const HomePasswordSection: React.FC<HomePasswordSectionProps> = ({
       {/* 4 Golden Rules */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { title: 'Viết thường', desc: 'Không CapsLock, chỉ chữ thường.' },
+          { title: 'Viết thường', desc: 'Chữ thường (Trừ các gợi ý đặc biệt).' },
           { title: 'Không dấu', desc: 'Tiếng Việt không dấu liền nhau.' },
           { title: 'Không cách', desc: 'Không khoảng trắng thừa đầu cuối.' },
-          { title: 'Từ truyện', desc: 'Gợi ý nằm ngay ở các chương trước.' },
+          { title: 'Nội dung', desc: 'Gợi ý nằm ngay ở các chương trước.' },
         ].map((rule, idx) => (
           <div
             key={rule.title}
@@ -172,7 +172,7 @@ export const HomePasswordSection: React.FC<HomePasswordSectionProps> = ({
                 type="text"
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                placeholder="Nhập thử đáp án mật khẩu..."
+                placeholder="Nhập thử mật khẩu..."
                 className="flex-1 px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-xs text-stone-800 dark:text-stone-200 focus:outline-hidden focus:ring-1 focus:ring-amber-400"
               />
               <button
