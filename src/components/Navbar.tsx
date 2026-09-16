@@ -92,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const desktopNavItems: NavItem[] = [
     {
       id: 'completed',
-      label: 'Truyện đã hoàn',
+      label: 'Đã hoàn thành',
       shortLabel: 'Đã hoàn',
       icon: <BookOpen className="w-3.5 h-3.5 stroke-[1.75]" />,
     },
@@ -110,7 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: 'other',
-      label: 'Góc tâm sự & Nhạc',
+      label: 'Góc nghỉ ngơi',
       shortLabel: 'Tâm sự & Nhạc',
       icon: <Heart className="w-3.5 h-3.5 stroke-[1.75]" />,
     },
@@ -342,7 +342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-semibold flex items-center gap-1.5 text-pink-700 dark:text-pink-300">
-                        <span>Bàn làm việc Tác giả</span>
+                        <span>Quản trị</span>
                         <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200 font-sans">
                           Studio
                         </span>
@@ -429,7 +429,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="navbar-search-btn"
               onClick={onOpenSearch}
               className="flex items-center justify-center w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-lg text-stone-600 hover:text-pink-600 hover:bg-white dark:bg-transparent dark:text-stone-300 dark:hover:bg-stone-700 dark:hover:text-pink-300 transition-all cursor-pointer"
-              title="Tìm kiếm truyện và chương (Ctrl+K / ⌘K)"
+              title="Tìm kiếm (Ctrl+K / ⌘K)"
               aria-label="Tìm kiếm truyện"
             >
               <Search className="w-3.5 h-3.5" />
@@ -568,7 +568,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-base">🌸</span>
                 <span className="font-serif text-sm font-bold text-stone-800 dark:text-stone-100">
-                  Mục Lục & Tính Năng
+                  Các danh mục
                 </span>
               </div>
               <button
@@ -662,7 +662,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <span className="flex items-center gap-2">
                     <PenTool className="w-4 h-4" />
-                    <span>Bàn làm việc Tác giả & Xuất bản</span>
+                    <span>Quản trị</span>
                   </span>
                   <span className="text-[10px] bg-white/25 px-2 py-0.5 rounded-full font-mono">
                     Studio
