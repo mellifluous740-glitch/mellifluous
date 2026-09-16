@@ -66,7 +66,7 @@ export const AboutView: React.FC = () => {
             <Coffee className="w-5 h-5" />
           </div>
           <h3 className="font-serif text-base font-bold text-stone-800 dark:text-stone-100">
-            LỜI CẢM ƠN CẢU MELL
+            LỜI CẢM ƠN CỦA MELL
           </h3>
           <p className="text-xs text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
             Cảm ơn các tình iu đã ghé qua và ở lại với Mell, mỗi bình luận, lượt đánh giá và lượt thả tim của các tình iu chính là nguồn động lực lớn nhất để Mell tiếp tục chèo lái chiếc thuyền nhỏ này.
