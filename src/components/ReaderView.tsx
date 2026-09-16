@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Story, Chapter, RealtimeComment } from '../types';
 import {
   subscribeToComments,
@@ -224,8 +224,18 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [newComment, setNewComment] = useState('');
   const [commenterName, setCommenterName] = useState('');
 
-  // Comment replies & deletion state
-  const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
+  // Comment filter & pagination state
+  const [commentSort, setCommentSort] = useState<'newest' | 'oldest'>('newest');
+  const [commentPage, setCommentPage] = useState(1);
+  const COMMENTS_PER_PAGE = 5;
+
+  // Tree replying state
+  interface ReplyingTarget {
+    commentId: string;
+    replyToId?: string;
+    replyToUser: string;
+  }
+  const [replyingTarget, setReplyingTarget] = useState<ReplyingTarget | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyUserName, setReplyUserName] = useState('');
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
@@ -269,6 +279,54 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       unsubscribeStats();
     };
   }, [story.id, chapter.chapterNumber, story.views, story.likes]);
+
+  // Reset comment page when changing chapter
+  useEffect(() => {
+    setCommentPage(1);
+    setReplyingTarget(null);
+  }, [story.id, chapter.chapterNumber]);
+
+  // Sorted comments based on newest / oldest
+  const sortedComments = useMemo(() => {
+    return [...comments].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return commentSort === 'newest' ? timeB - timeA : timeA - timeB;
+    });
+  }, [comments, commentSort]);
+
+  const totalCommentPages = Math.max(1, Math.ceil(sortedComments.length / COMMENTS_PER_PAGE));
+  const currentCommentPage = Math.min(commentPage, totalCommentPages);
+
+  const paginatedComments = useMemo(() => {
+    const start = (currentCommentPage - 1) * COMMENTS_PER_PAGE;
+    return sortedComments.slice(start, start + COMMENTS_PER_PAGE);
+  }, [sortedComments, currentCommentPage]);
+
+  const getPaginationPages = (current: number, total: number): (number | string)[] => {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages: (number | string)[] = [];
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...');
+      pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(current - 1);
+      pages.push(current);
+      pages.push(current + 1);
+      pages.push('...');
+      pages.push(total);
+    }
+    return pages;
+  };
 
   // Persist reader settings
   useEffect(() => {
@@ -390,8 +448,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     }
   };
 
-  const handleSendReply = async (commentId: string) => {
-    if (!replyText.trim() || isSubmittingReply) return;
+  const handleSendReply = async () => {
+    if (!replyingTarget || !replyText.trim() || isSubmittingReply) return;
     setIsSubmittingReply(true);
 
     const sender = isMainAuthor
@@ -408,21 +466,26 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       isCollaborator: Boolean(isCollaborator),
       roleBadge: isMainAuthor ? 'Tác giả' : isCollaborator ? 'Cộng sự' : undefined,
       userEmail: user?.email || null,
+      replyToUser: replyingTarget.replyToUser,
+      replyToId: replyingTarget.replyToId,
     };
 
     try {
-      const createdReply = await postCommentReply(commentId, replyPayload);
-      // Optimistic update of comments state
+      const createdReply = await postCommentReply(replyingTarget.commentId, replyPayload);
+      // Optimistic update of comments state (guard against duplicates)
       setComments((prev) =>
-        prev.map((c) =>
-          c.id === commentId
-            ? { ...c, replies: [...(c.replies || []), createdReply] }
-            : c
-        )
+        prev.map((c) => {
+          if (c.id !== replyingTarget.commentId) return c;
+          const currentReplies = c.replies || [];
+          if (currentReplies.some((r) => r.id === createdReply.id)) {
+            return c;
+          }
+          return { ...c, replies: [...currentReplies, createdReply] };
+        })
       );
       setReplyText('');
       setReplyUserName('');
-      setReplyingCommentId(null);
+      setReplyingTarget(null);
     } catch (err) {
       console.error('Failed to post reply:', err);
     } finally {
@@ -1057,16 +1120,52 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       <section
         className={`w-full mt-6 sm:mt-8 lg:mt-10 p-4 sm:p-8 rounded-3xl border shadow-xs space-y-5 transition-colors duration-300 overflow-hidden ${currentTheme.cardBg} ${currentTheme.cardBorder}`}
       >
-        <div className={`flex items-center justify-between border-b pb-3.5 ${currentTheme.dividerColor}`}>
+        <div className={`flex items-center justify-between border-b pb-3.5 flex-wrap gap-2.5 ${currentTheme.dividerColor}`}>
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-pink-500 shrink-0" />
             <h3 className={`font-serif text-base sm:text-lg font-bold ${currentTheme.textColor}`}>
               Bình luận ({comments.length})
             </h3>
           </div>
-          <span className={`text-xs font-serif italic ${currentTheme.subtextColor}`}>
-            Cùng chia sẻ cảm xúc nhé ~
-          </span>
+
+          {/* Lọc Mới nhất / Cũ nhất */}
+          {comments.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] ${currentTheme.subtextColor} hidden sm:flex items-center gap-1`}>
+                <ArrowUpDown className="w-3 h-3 text-pink-500" /> Sắp xếp:
+              </span>
+              <div className={`inline-flex items-center p-0.5 rounded-xl border text-xs ${currentTheme.cardBorder} ${currentTheme.secondaryBtnBg}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCommentSort('newest');
+                    setCommentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    commentSort === 'newest'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs font-semibold'
+                      : `${currentTheme.textColor} hover:text-pink-500`
+                  }`}
+                >
+                  Mới nhất
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCommentSort('oldest');
+                    setCommentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    commentSort === 'oldest'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs font-semibold'
+                      : `${currentTheme.textColor} hover:text-pink-500`
+                  }`}
+                >
+                  Cũ nhất
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* User Auth Status or Login Prompt for Commenting */}
@@ -1137,9 +1236,10 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               🌸 Chưa có bình luận nào cho chương này. Hãy là người đầu tiên chia sẻ cảm nhận nhé!
             </div>
           ) : (
-            comments.map((cmt) => {
+            paginatedComments.map((cmt) => {
               const isCmtMainAuthor = cmt.roleBadge === 'Tác giả' || (cmt.isAuthor && !cmt.isCollaborator);
               const isCmtCollaborator = cmt.roleBadge === 'Cộng sự' || cmt.isCollaborator;
+              const isReplyingToRoot = replyingTarget?.commentId === cmt.id && !replyingTarget?.replyToId;
 
               return (
                 <div
@@ -1220,17 +1320,21 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                             <span>{cmt.likes || 0}</span>
                           </button>
 
-                          {/* Reply button */}
+                          {/* Reply button for root comment */}
                           <button
                             type="button"
                             onClick={() => {
-                              setReplyingCommentId(replyingCommentId === cmt.id ? null : cmt.id);
-                              setReplyText('');
+                              if (isReplyingToRoot) {
+                                setReplyingTarget(null);
+                              } else {
+                                setReplyingTarget({ commentId: cmt.id, replyToUser: cmt.user });
+                                setReplyText('');
+                              }
                             }}
                             className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
                           >
                             <Reply className="w-3 h-3" />
-                            <span>{replyingCommentId === cmt.id ? 'Hủy trả lời' : 'Trả lời'}</span>
+                            <span>{isReplyingToRoot ? 'Hủy trả lời' : 'Trả lời'}</span>
                           </button>
                         </div>
 
@@ -1249,81 +1353,10 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Nested Replies */}
-                  {cmt.replies && cmt.replies.length > 0 && (
-                    <div className="pl-4 sm:pl-7 space-y-2 border-l-2 border-pink-200/80 dark:border-stone-700 ml-3.5 my-1.5">
-                      {cmt.replies.map((rep) => {
-                        const isRepMainAuthor = rep.roleBadge === 'Tác giả' || (rep.isAuthor && !rep.isCollaborator);
-                        const isRepCollaborator = rep.roleBadge === 'Cộng sự' || rep.isCollaborator;
-
-                        return (
-                          <div
-                            key={rep.id}
-                            className={`p-3 rounded-2xl text-xs space-y-1 transition-all ${
-                              isRepMainAuthor
-                                ? 'bg-rose-100/70 dark:bg-rose-950/45 border border-rose-300 dark:border-rose-900/60 shadow-2xs'
-                                : isRepCollaborator
-                                ? 'bg-emerald-100/70 dark:bg-emerald-950/45 border border-emerald-300 dark:border-emerald-900/60 shadow-2xs'
-                                : `${currentTheme.cardBg} border ${currentTheme.cardBorder}`
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
-                              <div className="flex items-center gap-1.5">
-                                <CornerDownRight className={`w-3 h-3 shrink-0 ${isRepMainAuthor ? 'text-rose-500' : isRepCollaborator ? 'text-emerald-500' : 'text-pink-500'}`} />
-                                <span className={`font-semibold ${isRepMainAuthor ? 'text-rose-950 dark:text-rose-200' : isRepCollaborator ? 'text-emerald-950 dark:text-emerald-200' : currentTheme.textColor}`}>
-                                  {rep.user}
-                                </span>
-                                {isRepMainAuthor && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200 border border-rose-300">
-                                    🌸 Tác giả • Mellifluous
-                                  </span>
-                                )}
-                                {isRepCollaborator && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300">
-                                    🌿 Cộng sự • BQT
-                                  </span>
-                                )}
-                              </div>
-                              <span className={`text-[10px] font-mono ${currentTheme.subtextColor}`}>
-                                {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className={`pl-4 font-sans text-xs sm:text-[13px] leading-relaxed break-words ${currentTheme.textColor}`}>
-                              {rep.text}
-                            </p>
-
-                            {/* Reply Like button */}
-                            <div className="flex items-center justify-end pl-4 pt-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleReplyLike(cmt.id, rep.id)}
-                                className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
-                                  (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
-                                    ? 'text-rose-600 dark:text-rose-400 font-semibold'
-                                    : 'text-stone-400 hover:text-rose-500'
-                                }`}
-                                title="Yêu thích phản hồi này"
-                              >
-                                <Heart
-                                  className={`w-3 h-3 transition-transform active:scale-125 ${
-                                    (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
-                                      ? 'fill-rose-500 text-rose-500'
-                                      : ''
-                                  }`}
-                                />
-                                <span>{rep.likes || 0}</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Inline Reply Form (Free for everyone) */}
-                  {replyingCommentId === cmt.id && (
-                    <div className="pl-4 sm:pl-7 pt-2">
-                      <div className={`p-3 rounded-2xl border space-y-2.5 ${currentTheme.secondaryBtnBg} ${currentTheme.cardBorder}`}>
+                  {/* Inline Reply Form directly replying to the root comment */}
+                  {isReplyingToRoot && (
+                    <div className="pl-4 sm:pl-7 pt-1">
+                      <div className={`p-3 rounded-2xl border space-y-2.5 ${currentTheme.cardBg} ${currentTheme.cardBorder}`}>
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-semibold text-pink-600 dark:text-pink-400 flex items-center gap-1">
                             <CornerDownRight className="w-3.5 h-3.5" />
@@ -1332,23 +1365,22 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              setReplyingCommentId(null);
+                              setReplyingTarget(null);
                               setReplyText('');
                             }}
-                            className="text-stone-400 hover:text-stone-600 text-xs cursor-pointer"
+                            className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-xs cursor-pointer p-0.5"
                           >
                             Hủy
                           </button>
                         </div>
 
-                        {/* Guest name input if not logged in */}
                         {!user && (
                           <input
                             type="text"
                             value={replyUserName}
                             onChange={(e) => setReplyUserName(e.target.value)}
                             placeholder="Tên / Biệt hiệu của bạn (không bắt buộc)..."
-                            className={`w-full sm:w-64 px-3 py-1.5 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.cardBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                            className={`w-full sm:w-64 px-3 py-1.5 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
                           />
                         )}
 
@@ -1362,20 +1394,20 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                                 ? '🌸 Mellifluous phản hồi bạn đọc...'
                                 : isCollaborator
                                 ? '🌿 Ban quản trị phản hồi...'
-                                : 'Nhập nội dung phản hồi của bạn...'
+                                : `Nhập câu trả lời gửi đến @${cmt.user}...`
                             }
-                            className={`flex-1 px-3 py-2 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.cardBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                            className={`flex-1 px-3 py-2 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleSendReply(cmt.id);
+                                handleSendReply();
                               }
                             }}
                           />
                           <button
                             type="button"
-                            onClick={() => handleSendReply(cmt.id)}
+                            onClick={handleSendReply}
                             disabled={isSubmittingReply || !replyText.trim()}
                             className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs"
                           >
@@ -1385,11 +1417,233 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Nested Tree Replies */}
+                  {cmt.replies && cmt.replies.length > 0 && (
+                    <div className="pl-3 sm:pl-6 space-y-2.5 border-l-2 border-pink-200/80 dark:border-stone-700 ml-3.5 my-2">
+                      {cmt.replies.map((rep, repIdx) => {
+                        const isRepMainAuthor = rep.roleBadge === 'Tác giả' || (rep.isAuthor && !rep.isCollaborator);
+                        const isRepCollaborator = rep.roleBadge === 'Cộng sự' || rep.isCollaborator;
+                        const isReplyingToThisRep = replyingTarget?.commentId === cmt.id && replyingTarget?.replyToId === rep.id;
+                        const isChildReply = Boolean(rep.replyToId);
+
+                        return (
+                          <div
+                            key={`${cmt.id}_rep_${rep.id || repIdx}_${repIdx}`}
+                            className={`space-y-2 ${isChildReply ? 'ml-2 sm:ml-4 border-l-2 border-pink-300/60 dark:border-pink-900/60 pl-2 sm:pl-3' : ''}`}
+                          >
+                            <div
+                              className={`p-3 rounded-2xl text-xs space-y-1.5 transition-all ${
+                                isRepMainAuthor
+                                  ? 'bg-rose-100/70 dark:bg-rose-950/45 border border-rose-300 dark:border-rose-900/60 shadow-2xs'
+                                  : isRepCollaborator
+                                  ? 'bg-emerald-100/70 dark:bg-emerald-950/45 border border-emerald-300 dark:border-emerald-900/60 shadow-2xs'
+                                  : `${currentTheme.cardBg} border ${currentTheme.cardBorder}`
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                  <CornerDownRight className={`w-3 h-3 shrink-0 ${isRepMainAuthor ? 'text-rose-500' : isRepCollaborator ? 'text-emerald-500' : 'text-pink-500'}`} />
+                                  <span className={`font-semibold ${isRepMainAuthor ? 'text-rose-950 dark:text-rose-200' : isRepCollaborator ? 'text-emerald-950 dark:text-emerald-200' : currentTheme.textColor}`}>
+                                    {rep.user}
+                                  </span>
+
+                                  {/* Hiển thị trả lời ai */}
+                                  {rep.replyToUser && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-pink-600 dark:text-pink-400 font-medium bg-pink-100/70 dark:bg-pink-950/70 px-1.5 py-0.2 rounded-md border border-pink-200/60 dark:border-pink-900/50 shrink-0">
+                                      ↳ trả lời <strong>@{rep.replyToUser}</strong>
+                                    </span>
+                                  )}
+
+                                  {isRepMainAuthor && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200 border border-rose-300 shrink-0">
+                                      🌸 Tác giả • Mellifluous
+                                    </span>
+                                  )}
+                                  {isRepCollaborator && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300 shrink-0">
+                                      🌿 Cộng sự • BQT
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-[10px] font-mono shrink-0 ${currentTheme.subtextColor}`}>
+                                  {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              <p className={`pl-4 font-sans text-xs sm:text-[13px] leading-relaxed break-words ${currentTheme.textColor}`}>
+                                {rep.text}
+                              </p>
+
+                              {/* Action buttons on this reply: Like + Reply */}
+                              <div className="flex items-center justify-between pl-4 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isReplyingToThisRep) {
+                                      setReplyingTarget(null);
+                                    } else {
+                                      setReplyingTarget({ commentId: cmt.id, replyToId: rep.id, replyToUser: rep.user });
+                                      setReplyText('');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
+                                >
+                                  <Reply className="w-3 h-3" />
+                                  <span>{isReplyingToThisRep ? 'Hủy trả lời' : 'Trả lời'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReplyLike(cmt.id, rep.id)}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                                    (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                      ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                      : 'text-stone-400 hover:text-rose-500'
+                                  }`}
+                                  title="Yêu thích phản hồi này"
+                                >
+                                  <Heart
+                                    className={`w-3 h-3 transition-transform active:scale-125 ${
+                                      (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                        ? 'fill-rose-500 text-rose-500'
+                                        : ''
+                                    }`}
+                                  />
+                                  <span>{rep.likes || 0}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Inline Reply Form nested under this specific reply */}
+                            {isReplyingToThisRep && (
+                              <div className="pl-3 sm:pl-4 pt-1">
+                                <div className={`p-3 rounded-2xl border space-y-2.5 ${currentTheme.secondaryBtnBg} ${currentTheme.cardBorder}`}>
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="font-semibold text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                      <CornerDownRight className="w-3.5 h-3.5" />
+                                      <span>Trả lời cho <strong>@{rep.user}</strong></span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyingTarget(null);
+                                        setReplyText('');
+                                      }}
+                                      className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-xs cursor-pointer p-0.5"
+                                    >
+                                      Hủy
+                                    </button>
+                                  </div>
+
+                                  {!user && (
+                                    <input
+                                      type="text"
+                                      value={replyUserName}
+                                      onChange={(e) => setReplyUserName(e.target.value)}
+                                      placeholder="Tên / Biệt hiệu của bạn (không bắt buộc)..."
+                                      className={`w-full sm:w-64 px-3 py-1.5 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.cardBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                                    />
+                                  )}
+
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                      placeholder={`Nhập phản hồi gửi đến @${rep.user}...`}
+                                      className={`flex-1 px-3 py-2 rounded-xl border text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden ${currentTheme.cardBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleSendReply();
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={handleSendReply}
+                                      disabled={isSubmittingReply || !replyText.trim()}
+                                      className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs"
+                                    >
+                                      {isSubmittingReply ? 'Đang gửi...' : 'Gửi'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })
           )}
         </div>
+
+        {/* Pagination Controls (tối đa 5 bình luận gốc mỗi trang) */}
+        {totalCommentPages > 1 && (
+          <div className={`flex flex-col sm:flex-row items-center justify-between pt-4 pb-1 border-t gap-3 ${currentTheme.dividerColor}`}>
+            <div className={`text-xs ${currentTheme.subtextColor}`}>
+              Trang <span className="font-semibold text-pink-600 dark:text-pink-400">{currentCommentPage}</span> / {totalCommentPages} • ({sortedComments.length} bình luận gốc)
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                disabled={currentCommentPage <= 1}
+                onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+                className={`p-2 rounded-xl border text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder} hover:border-pink-300`}
+                title="Trang trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {getPaginationPages(currentCommentPage, totalCommentPages).map((p, idx) => {
+                if (p === '...') {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className={`px-2 py-1 text-xs select-none ${currentTheme.subtextColor}`}
+                    >
+                      ...
+                    </span>
+                  );
+                }
+
+                const pageNum = Number(p);
+                const isActive = pageNum === currentCommentPage;
+                return (
+                  <button
+                    key={`page-${pageNum}`}
+                    type="button"
+                    onClick={() => setCommentPage(pageNum)}
+                    className={`min-w-[32px] h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-2xs'
+                        : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder} border hover:border-pink-300 hover:text-pink-500`
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                disabled={currentCommentPage >= totalCommentPages}
+                onClick={() => setCommentPage((p) => Math.min(totalCommentPages, p + 1))}
+                className={`p-2 rounded-xl border text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder} hover:border-pink-300`}
+                title="Trang sau"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
 

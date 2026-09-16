@@ -504,32 +504,46 @@ export const subscribeToComments = (
       const list: RealtimeComment[] = [];
       snapshot.forEach((d) => {
         const item = d.data();
-        list.push({
-          id: d.id,
-          storyId: item.storyId,
-          chapterId: item.chapterId,
-          chapterNumber: item.chapterNumber,
-          user: item.user || 'Độc giả yêu truyện',
-          userEmail: item.userEmail,
-          userId: item.userId,
-          isAuthor: Boolean(item.isAuthor),
-          isCollaborator: Boolean(item.isCollaborator),
-          roleBadge: item.roleBadge || (item.isAuthor ? 'Tác giả' : item.isCollaborator ? 'Cộng sự' : undefined),
-          avatar: item.avatar || '🌸',
-          text: item.text,
-          createdAt: item.createdAt || new Date().toISOString(),
-          rating: item.rating,
-          likes: typeof item.likes === 'number' ? item.likes : 0,
-          likedBy: Array.isArray(item.likedBy) ? item.likedBy : [],
-          replies: (item.replies || []).map((r: any) => ({
-            ...r,
-            isAuthor: Boolean(r.isAuthor),
-            isCollaborator: Boolean(r.isCollaborator),
-            roleBadge: r.roleBadge || (r.isAuthor ? 'Tác giả' : r.isCollaborator ? 'Cộng sự' : undefined),
-            likes: typeof r.likes === 'number' ? r.likes : 0,
-            likedBy: Array.isArray(r.likedBy) ? r.likedBy : [],
-          })),
-        });
+          const rawReplies = Array.isArray(item.replies) ? item.replies : [];
+          const seenReplyIds = new Set<string>();
+          const dedupedReplies: CommentReply[] = [];
+          for (const r of rawReplies) {
+            const replyId = r?.id || `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            if (!seenReplyIds.has(replyId)) {
+              seenReplyIds.add(replyId);
+              dedupedReplies.push({
+                ...r,
+                id: replyId,
+                isAuthor: Boolean(r.isAuthor),
+                isCollaborator: Boolean(r.isCollaborator),
+                roleBadge: r.roleBadge || (r.isAuthor ? 'Tác giả' : r.isCollaborator ? 'Cộng sự' : undefined),
+                likes: typeof r.likes === 'number' ? r.likes : 0,
+                likedBy: Array.isArray(r.likedBy) ? r.likedBy : [],
+                replyToUser: r.replyToUser || undefined,
+                replyToId: r.replyToId || undefined,
+              });
+            }
+          }
+
+          list.push({
+            id: d.id,
+            storyId: item.storyId,
+            chapterId: item.chapterId,
+            chapterNumber: item.chapterNumber,
+            user: item.user || 'Độc giả yêu truyện',
+            userEmail: item.userEmail,
+            userId: item.userId,
+            isAuthor: Boolean(item.isAuthor),
+            isCollaborator: Boolean(item.isCollaborator),
+            roleBadge: item.roleBadge || (item.isAuthor ? 'Tác giả' : item.isCollaborator ? 'Cộng sự' : undefined),
+            avatar: item.avatar || '🌸',
+            text: item.text,
+            createdAt: item.createdAt || new Date().toISOString(),
+            rating: item.rating,
+            likes: typeof item.likes === 'number' ? item.likes : 0,
+            likedBy: Array.isArray(item.likedBy) ? item.likedBy : [],
+            replies: dedupedReplies,
+          });
       });
 
       if (chapterNumber !== null && chapterNumber !== undefined) {
@@ -628,6 +642,8 @@ export const postCommentReply = async (
     isCollaborator?: boolean;
     roleBadge?: string;
     userEmail?: string | null;
+    replyToUser?: string;
+    replyToId?: string;
   }
 ): Promise<CommentReply> => {
   const fallbackUser = reply.isAuthor
@@ -650,26 +666,35 @@ export const postCommentReply = async (
     userEmail: reply.userEmail || null,
     likes: 0,
     likedBy: [],
+    replyToUser: reply.replyToUser || undefined,
+    replyToId: reply.replyToId || undefined,
   };
 
   try {
     const commentRef = doc(db, 'comments', commentId);
-    try {
+    const snap = await getDoc(commentRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const currentReplies: CommentReply[] = Array.isArray(data.replies) ? data.replies : [];
+      // Clean and deduplicate existing replies
+      const seenIds = new Set<string>();
+      const cleanedReplies: CommentReply[] = [];
+      for (const r of currentReplies) {
+        if (r && r.id && !seenIds.has(r.id) && r.id !== newReplyItem.id) {
+          seenIds.add(r.id);
+          cleanedReplies.push(r);
+        }
+      }
+      cleanedReplies.push(newReplyItem);
+      await updateDoc(commentRef, {
+        replies: cleanedReplies,
+        lastRepliedAt: new Date().toISOString(),
+      });
+    } else {
       await updateDoc(commentRef, {
         replies: arrayUnion(newReplyItem),
         lastRepliedAt: new Date().toISOString(),
       });
-    } catch (atomicErr) {
-      console.warn('arrayUnion failed, trying fallback getDoc + updateDoc:', atomicErr);
-      const snap = await getDoc(commentRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const currentReplies: CommentReply[] = data.replies || [];
-        await updateDoc(commentRef, {
-          replies: [...currentReplies, newReplyItem],
-          lastRepliedAt: new Date().toISOString(),
-        });
-      }
     }
   } catch (err) {
     console.error('Failed to post comment reply to Firestore:', err);
@@ -729,7 +754,13 @@ export const toggleReplyLike = async (
     let isLikedNow = false;
     let finalLikes = 0;
 
-    const updatedReplies = currentReplies.map((r) => {
+    const seenIds = new Set<string>();
+    const updatedReplies: CommentReply[] = [];
+
+    for (const r of currentReplies) {
+      if (!r || !r.id || seenIds.has(r.id)) continue;
+      seenIds.add(r.id);
+
       if (r.id === replyId) {
         const likedBy = Array.isArray(r.likedBy) ? r.likedBy : [];
         const hasLiked = likedBy.includes(visitorId);
@@ -739,10 +770,11 @@ export const toggleReplyLike = async (
         const newLikes = Math.max(0, newLikedBy.length);
         isLikedNow = !hasLiked;
         finalLikes = newLikes;
-        return { ...r, likes: newLikes, likedBy: newLikedBy };
+        updatedReplies.push({ ...r, likes: newLikes, likedBy: newLikedBy });
+      } else {
+        updatedReplies.push(r);
       }
-      return r;
-    });
+    }
 
     await updateDoc(commentRef, {
       replies: updatedReplies,

@@ -73,6 +73,8 @@ export interface CommentReply {
   userEmail?: string | null;
   likes?: number;
   likedBy?: string[];
+  replyToUser?: string;
+  replyToId?: string;
 }
 
 export interface RealtimeComment {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Story, Chapter, RealtimeComment } from '../types';
 import {
   ArrowLeft,
@@ -21,6 +21,9 @@ import {
   Trash2,
   CornerDownRight,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   subscribeToStoryStats,
@@ -30,6 +33,8 @@ import {
   subscribeToComments,
   postRealtimeComment,
   postCommentReply,
+  toggleCommentLike,
+  toggleReplyLike,
   deleteComment,
   recordStoryView,
 } from '../lib/realtimeService';
@@ -88,8 +93,18 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isCopiedShare, setIsCopiedShare] = useState(false);
 
-  // Reply & moderation state
-  const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
+  // Comment filter & pagination state
+  const [commentSort, setCommentSort] = useState<'newest' | 'oldest'>('newest');
+  const [commentPage, setCommentPage] = useState(1);
+  const COMMENTS_PER_PAGE = 5;
+
+  // Tree replying state
+  interface ReplyingTarget {
+    commentId: string;
+    replyToId?: string;
+    replyToUser: string;
+  }
+  const [replyingTarget, setReplyingTarget] = useState<ReplyingTarget | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyUserName, setReplyUserName] = useState('');
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
@@ -132,6 +147,54 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
       unsubscribeComments();
     };
   }, [story.id, story.views, story.likes]);
+
+  // Reset comment page when changing story
+  useEffect(() => {
+    setCommentPage(1);
+    setReplyingTarget(null);
+  }, [story.id]);
+
+  // Sorted comments based on newest / oldest
+  const sortedComments = useMemo(() => {
+    return [...comments].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return commentSort === 'newest' ? timeB - timeA : timeA - timeB;
+    });
+  }, [comments, commentSort]);
+
+  const totalCommentPages = Math.max(1, Math.ceil(sortedComments.length / COMMENTS_PER_PAGE));
+  const currentCommentPage = Math.min(commentPage, totalCommentPages);
+
+  const paginatedComments = useMemo(() => {
+    const start = (currentCommentPage - 1) * COMMENTS_PER_PAGE;
+    return sortedComments.slice(start, start + COMMENTS_PER_PAGE);
+  }, [sortedComments, currentCommentPage]);
+
+  const getPaginationPages = (current: number, total: number): (number | string)[] => {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages: (number | string)[] = [];
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...');
+      pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(current - 1);
+      pages.push(current);
+      pages.push(current + 1);
+      pages.push('...');
+      pages.push(total);
+    }
+    return pages;
+  };
 
   const handleToggleLike = () => {
     const nextState = !isLiked;
@@ -194,8 +257,8 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
     }
   };
 
-  const handleSendReply = async (commentId: string) => {
-    if (!replyText.trim() || isSubmittingReply) return;
+  const handleSendReply = async () => {
+    if (!replyingTarget || !replyText.trim() || isSubmittingReply) return;
     setIsSubmittingReply(true);
 
     const sender = isMainAuthor
@@ -212,25 +275,61 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
       isCollaborator: Boolean(isCollaborator),
       roleBadge: isMainAuthor ? 'Tác giả' : isCollaborator ? 'Cộng sự' : undefined,
       userEmail: user?.email || null,
+      replyToUser: replyingTarget.replyToUser,
+      replyToId: replyingTarget.replyToId,
     };
 
     try {
-      const createdReply = await postCommentReply(commentId, replyPayload);
-      // Optimistic update of comments state
+      const createdReply = await postCommentReply(replyingTarget.commentId, replyPayload);
+      // Optimistic update of comments state (guard against duplicates)
       setComments((prev) =>
-        prev.map((c) =>
-          c.id === commentId
-            ? { ...c, replies: [...(c.replies || []), createdReply] }
-            : c
-        )
+        prev.map((c) => {
+          if (c.id !== replyingTarget.commentId) return c;
+          const currentReplies = c.replies || [];
+          if (currentReplies.some((r) => r.id === createdReply.id)) {
+            return c;
+          }
+          return { ...c, replies: [...currentReplies, createdReply] };
+        })
       );
       setReplyText('');
       setReplyUserName('');
-      setReplyingCommentId(null);
+      setReplyingTarget(null);
     } catch (err) {
       console.error('Failed to reply:', err);
     } finally {
       setIsSubmittingReply(false);
+    }
+  };
+
+  const getVisitorId = () => {
+    try {
+      let id = localStorage.getItem('mel_visitor_uuid');
+      if (!id) {
+        id = 'v_' + Math.random().toString(36).slice(2, 11);
+        localStorage.setItem('mel_visitor_uuid', id);
+      }
+      return id;
+    } catch {
+      return 'guest_' + Date.now();
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: string) => {
+    const visitorId = user?.uid || user?.email || getVisitorId();
+    try {
+      await toggleCommentLike(commentId, visitorId);
+    } catch (err) {
+      console.error('Failed to like comment:', err);
+    }
+  };
+
+  const handleToggleReplyLike = async (commentId: string, replyId: string) => {
+    const visitorId = user?.uid || user?.email || getVisitorId();
+    try {
+      await toggleReplyLike(commentId, replyId, visitorId);
+    } catch (err) {
+      console.error('Failed to like reply:', err);
     }
   };
 
@@ -672,7 +771,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
 
       {/* Realtime Reader Comments Section */}
       <section className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-stone-800/90 border border-stone-200 dark:border-stone-700 shadow-xs space-y-6">
-        <div className="flex items-center justify-between border-b border-pink-100 dark:border-stone-700 pb-4">
+        <div className="flex items-center justify-between border-b border-pink-100 dark:border-stone-700 pb-4 gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-pink-500" />
             <h2 className="font-serif text-xl font-bold text-stone-800 dark:text-stone-100">
@@ -682,9 +781,44 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
               {comments.length}
             </span>
           </div>
-          <span className="text-xs text-stone-400 font-sans hidden sm:inline">
-            Cập nhật tự động trên mọi thiết bị
-          </span>
+
+          {/* Lọc bình luận Mới nhất / Cũ nhất */}
+          {comments.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs bg-stone-100 dark:bg-stone-900/90 p-1 rounded-xl border border-stone-200 dark:border-stone-700">
+              <span className="text-stone-400 pl-2 flex items-center gap-1 text-[11px]">
+                <ArrowUpDown className="w-3 h-3" />
+                <span className="hidden xs:inline">Sắp xếp:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCommentSort('newest');
+                  setCommentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  commentSort === 'newest'
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs font-semibold'
+                    : 'text-stone-600 dark:text-stone-300 hover:text-pink-500'
+                }`}
+              >
+                Mới nhất
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCommentSort('oldest');
+                  setCommentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  commentSort === 'oldest'
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs font-semibold'
+                    : 'text-stone-600 dark:text-stone-300 hover:text-pink-500'
+                }`}
+              >
+                Cũ nhất
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Active auth status or prompt */}
@@ -756,9 +890,10 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
               Chưa có bình luận nào. Hãy là người đầu tiên để lại cảm xúc nhé! 🌸
             </div>
           ) : (
-            comments.map((cmt) => {
+            paginatedComments.map((cmt) => {
               const isCmtMainAuthor = cmt.roleBadge === 'Tác giả' || (cmt.isAuthor && !cmt.isCollaborator);
               const isCmtCollaborator = cmt.roleBadge === 'Cộng sự' || cmt.isCollaborator;
+              const isReplyingToRoot = replyingTarget?.commentId === cmt.id && !replyingTarget?.replyToId;
 
               return (
                 <div
@@ -815,19 +950,47 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                         {cmt.text}
                       </p>
 
-                      {/* Actions: Reply and Delete */}
+                      {/* Actions: Like, Reply and Delete */}
                       <div className="flex items-center justify-between pt-1 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyingCommentId(replyingCommentId === cmt.id ? null : cmt.id);
-                            setReplyText('');
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
-                        >
-                          <Reply className="w-3 h-3" />
-                          <span>{replyingCommentId === cmt.id ? 'Hủy trả lời' : 'Trả lời'}</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {/* Like button for root comment */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCommentLike(cmt.id)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                              (cmt.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                : 'text-stone-500 hover:text-rose-500 dark:text-stone-400'
+                            }`}
+                            title="Yêu thích bình luận này"
+                          >
+                            <Heart
+                              className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
+                                (cmt.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                  ? 'fill-rose-500 text-rose-500'
+                                  : ''
+                              }`}
+                            />
+                            <span>{cmt.likes || 0}</span>
+                          </button>
+
+                          {/* Reply button for root comment */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isReplyingToRoot) {
+                                setReplyingTarget(null);
+                              } else {
+                                setReplyingTarget({ commentId: cmt.id, replyToUser: cmt.user });
+                                setReplyText('');
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
+                          >
+                            <Reply className="w-3 h-3" />
+                            <span>{isReplyingToRoot ? 'Hủy trả lời' : 'Trả lời'}</span>
+                          </button>
+                        </div>
 
                         {(isAuthor || isCollaborator) && (
                           <button
@@ -844,57 +1007,9 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Nested Replies */}
-                  {cmt.replies && cmt.replies.length > 0 && (
-                    <div className="pl-4 sm:pl-7 space-y-2 border-l-2 border-pink-200/80 dark:border-stone-700 ml-4 my-1.5">
-                      {cmt.replies.map((rep) => {
-                        const isRepMainAuthor = rep.roleBadge === 'Tác giả' || (rep.isAuthor && !rep.isCollaborator);
-                        const isRepCollaborator = rep.roleBadge === 'Cộng sự' || rep.isCollaborator;
-
-                        return (
-                          <div
-                            key={rep.id}
-                            className={`p-3 rounded-2xl text-xs space-y-1 transition-all ${
-                              isRepMainAuthor
-                                ? 'bg-rose-100/70 dark:bg-rose-950/45 border border-rose-300 dark:border-rose-900/60 shadow-2xs'
-                                : isRepCollaborator
-                                ? 'bg-emerald-100/70 dark:bg-emerald-950/45 border border-emerald-300 dark:border-emerald-900/60 shadow-2xs'
-                                : 'bg-white dark:bg-stone-800 border border-stone-200/60 dark:border-stone-700'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
-                              <div className="flex items-center gap-1.5">
-                                <CornerDownRight className={`w-3 h-3 shrink-0 ${isRepMainAuthor ? 'text-rose-500' : isRepCollaborator ? 'text-emerald-500' : 'text-pink-500'}`} />
-                                <span className={`font-semibold ${isRepMainAuthor ? 'text-rose-950 dark:text-rose-200' : isRepCollaborator ? 'text-emerald-950 dark:text-emerald-200' : 'text-stone-800 dark:text-stone-200'}`}>
-                                  {rep.user}
-                                </span>
-                                {isRepMainAuthor && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200 border border-rose-300">
-                                    🌸 Tác giả • Mellifluous
-                                  </span>
-                                )}
-                                {isRepCollaborator && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300">
-                                    🌿 Cộng sự • BQT
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] font-mono text-stone-400">
-                                {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className="pl-4 font-sans text-xs sm:text-[13px] text-stone-700 dark:text-stone-300 leading-relaxed break-words">
-                              {rep.text}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Inline Reply Form (Free for everyone) */}
-                  {replyingCommentId === cmt.id && (
-                    <div className="pl-4 sm:pl-7 pt-2">
+                  {/* Inline Reply Form directly replying to the root comment */}
+                  {isReplyingToRoot && (
+                    <div className="pl-4 sm:pl-7 pt-1">
                       <div className="p-3 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-100/70 dark:bg-stone-900/80 space-y-2.5">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-semibold text-pink-600 dark:text-pink-400 flex items-center gap-1">
@@ -904,16 +1019,15 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              setReplyingCommentId(null);
+                              setReplyingTarget(null);
                               setReplyText('');
                             }}
-                            className="text-stone-400 hover:text-stone-600 text-xs cursor-pointer"
+                            className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-xs cursor-pointer p-0.5"
                           >
                             Hủy
                           </button>
                         </div>
 
-                        {/* Guest name input if not logged in */}
                         {!user && (
                           <input
                             type="text"
@@ -934,20 +1048,20 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                                 ? '🌸 Mellifluous phản hồi bạn đọc...'
                                 : isCollaborator
                                 ? '🌿 Ban quản trị phản hồi...'
-                                : 'Nhập phản hồi của bạn...'
+                                : `Nhập câu trả lời gửi đến @${cmt.user}...`
                             }
                             className="flex-1 px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden"
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleSendReply(cmt.id);
+                                handleSendReply();
                               }
                             }}
                           />
                           <button
                             type="button"
-                            onClick={() => handleSendReply(cmt.id)}
+                            onClick={handleSendReply}
                             disabled={isSubmittingReply || !replyText.trim()}
                             className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs"
                           >
@@ -957,11 +1071,233 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Nested Tree Replies */}
+                  {cmt.replies && cmt.replies.length > 0 && (
+                    <div className="pl-3 sm:pl-6 space-y-2.5 border-l-2 border-pink-200/80 dark:border-stone-700 ml-3.5 my-2">
+                      {cmt.replies.map((rep, repIdx) => {
+                        const isRepMainAuthor = rep.roleBadge === 'Tác giả' || (rep.isAuthor && !rep.isCollaborator);
+                        const isRepCollaborator = rep.roleBadge === 'Cộng sự' || rep.isCollaborator;
+                        const isReplyingToThisRep = replyingTarget?.commentId === cmt.id && replyingTarget?.replyToId === rep.id;
+                        const isChildReply = Boolean(rep.replyToId);
+
+                        return (
+                          <div
+                            key={`${cmt.id}_rep_${rep.id || repIdx}_${repIdx}`}
+                            className={`space-y-2 ${isChildReply ? 'ml-2 sm:ml-4 border-l-2 border-pink-300/60 dark:border-pink-900/60 pl-2 sm:pl-3' : ''}`}
+                          >
+                            <div
+                              className={`p-3 rounded-2xl text-xs space-y-1.5 transition-all ${
+                                isRepMainAuthor
+                                  ? 'bg-rose-100/70 dark:bg-rose-950/45 border border-rose-300 dark:border-rose-900/60 shadow-2xs'
+                                  : isRepCollaborator
+                                  ? 'bg-emerald-100/70 dark:bg-emerald-950/45 border border-emerald-300 dark:border-emerald-900/60 shadow-2xs'
+                                  : 'bg-white dark:bg-stone-800 border border-stone-200/60 dark:border-stone-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                  <CornerDownRight className={`w-3 h-3 shrink-0 ${isRepMainAuthor ? 'text-rose-500' : isRepCollaborator ? 'text-emerald-500' : 'text-pink-500'}`} />
+                                  <span className={`font-semibold ${isRepMainAuthor ? 'text-rose-950 dark:text-rose-200' : isRepCollaborator ? 'text-emerald-950 dark:text-emerald-200' : 'text-stone-800 dark:text-stone-200'}`}>
+                                    {rep.user}
+                                  </span>
+
+                                  {/* Hiển thị trả lời ai */}
+                                  {rep.replyToUser && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-pink-600 dark:text-pink-400 font-medium bg-pink-100/70 dark:bg-pink-950/70 px-1.5 py-0.2 rounded-md border border-pink-200/60 dark:border-pink-900/50 shrink-0">
+                                      ↳ trả lời <strong>@{rep.replyToUser}</strong>
+                                    </span>
+                                  )}
+
+                                  {isRepMainAuthor && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200 border border-rose-300 shrink-0">
+                                      🌸 Tác giả • Mellifluous
+                                    </span>
+                                  )}
+                                  {isRepCollaborator && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300 shrink-0">
+                                      🌿 Cộng sự • BQT
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-mono text-stone-400">
+                                  {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              <p className="pl-4 font-sans text-xs sm:text-[13px] text-stone-700 dark:text-stone-300 leading-relaxed break-words">
+                                {rep.text}
+                              </p>
+
+                              {/* Action buttons on this reply: Like + Reply */}
+                              <div className="flex items-center justify-between pl-4 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isReplyingToThisRep) {
+                                      setReplyingTarget(null);
+                                    } else {
+                                      setReplyingTarget({ commentId: cmt.id, replyToId: rep.id, replyToUser: rep.user });
+                                      setReplyText('');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
+                                >
+                                  <Reply className="w-3 h-3" />
+                                  <span>{isReplyingToThisRep ? 'Hủy trả lời' : 'Trả lời'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReplyLike(cmt.id, rep.id)}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                                    (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                      ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                      : 'text-stone-400 hover:text-rose-500'
+                                  }`}
+                                  title="Yêu thích phản hồi này"
+                                >
+                                  <Heart
+                                    className={`w-3 h-3 transition-transform active:scale-125 ${
+                                      (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                        ? 'fill-rose-500 text-rose-500'
+                                        : ''
+                                    }`}
+                                  />
+                                  <span>{rep.likes || 0}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Inline Reply Form nested under this specific reply */}
+                            {isReplyingToThisRep && (
+                              <div className="pl-3 sm:pl-4 pt-1">
+                                <div className="p-3 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-100/70 dark:bg-stone-900/80 space-y-2.5">
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="font-semibold text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                      <CornerDownRight className="w-3.5 h-3.5" />
+                                      <span>Trả lời cho <strong>@{rep.user}</strong></span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyingTarget(null);
+                                        setReplyText('');
+                                      }}
+                                      className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-xs cursor-pointer p-0.5"
+                                    >
+                                      Hủy
+                                    </button>
+                                  </div>
+
+                                  {!user && (
+                                    <input
+                                      type="text"
+                                      value={replyUserName}
+                                      onChange={(e) => setReplyUserName(e.target.value)}
+                                      placeholder="Tên / Biệt hiệu của bạn (không bắt buộc)..."
+                                      className="w-full sm:w-64 px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden"
+                                    />
+                                  )}
+
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                      placeholder={`Nhập phản hồi gửi đến @${rep.user}...`}
+                                      className="flex-1 px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs focus:ring-2 focus:ring-pink-400 focus:outline-hidden"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleSendReply();
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={handleSendReply}
+                                      disabled={isSubmittingReply || !replyText.trim()}
+                                      className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs"
+                                    >
+                                      {isSubmittingReply ? 'Đang gửi...' : 'Gửi'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })
           )}
         </div>
+
+        {/* Pagination Controls (tối đa 5 bình luận gốc mỗi trang) */}
+        {totalCommentPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between pt-4 pb-1 border-t border-stone-200 dark:border-stone-700 gap-3">
+            <div className="text-xs text-stone-500 dark:text-stone-400">
+              Trang <span className="font-semibold text-pink-600 dark:text-pink-400">{currentCommentPage}</span> / {totalCommentPages} • ({sortedComments.length} bình luận gốc)
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                disabled={currentCommentPage <= 1}
+                onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+                className="p-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 text-stone-700 dark:text-stone-300 text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:border-pink-300"
+                title="Trang trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {getPaginationPages(currentCommentPage, totalCommentPages).map((p, idx) => {
+                if (p === '...') {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-2 py-1 text-xs select-none text-stone-400"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+
+                const pageNum = Number(p);
+                const isActive = pageNum === currentCommentPage;
+                return (
+                  <button
+                    key={`page-${pageNum}`}
+                    type="button"
+                    onClick={() => setCommentPage(pageNum)}
+                    className={`min-w-[32px] h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-2xs'
+                        : 'border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:border-pink-300 hover:text-pink-500'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                disabled={currentCommentPage >= totalCommentPages}
+                onClick={() => setCommentPage((p) => Math.min(totalCommentPages, p + 1))}
+                className="p-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 text-stone-700 dark:text-stone-300 text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:border-pink-300"
+                title="Trang sau"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
     </div>
