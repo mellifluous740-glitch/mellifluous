@@ -115,10 +115,10 @@ export const CompletedStoriesView: React.FC<CompletedStoriesViewProps> = ({
           <div className="shrink-0 hidden md:flex flex-col items-center justify-center w-36 h-36 rounded-2xl bg-white/80 dark:bg-stone-800/80 border-2 border-dashed border-pink-300 dark:border-pink-800/80 p-3 shadow-inner rotate-2">
             <span className="text-4xl select-none">🌸</span>
             <span className="font-serif text-xs font-bold text-pink-700 dark:text-pink-300 mt-2 uppercase tracking-widest">
-              Full • HE
+              Full
             </span>
             <span className="text-[10px] text-stone-500 dark:text-stone-400">
-              Trọn vẹn 100%
+              2018-2026
             </span>
           </div>
         </div>
