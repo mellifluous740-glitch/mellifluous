@@ -153,7 +153,7 @@ export const AuthModal: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-stone-600 dark:text-stone-400 font-sans">
-              better and better ━ Không gian ngôn tình của Mellifluous
+              better and better
             </p>
           </div>
 
@@ -342,29 +342,6 @@ export const AuthModal: React.FC = () => {
                     <span>{isLoading ? 'Đang kết nối Google...' : 'Đăng nhập nhanh bằng tài khoản Gmail'}</span>
                   </button>
 
-                  <div className="relative flex py-2 items-center">
-                    <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
-                    <span className="flex-shrink mx-3 text-[11px] text-stone-400 uppercase font-sans">
-                      Dành cho Tác giả & Ban Quản trị
-                    </span>
-                    <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
-                  </div>
-
-                  {/* Automated Author & Collaborator Role Activation Note */}
-                  <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200/80 dark:border-stone-700/80 flex items-start gap-2.5 text-xs text-stone-600 dark:text-stone-300">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p className="font-semibold text-stone-800 dark:text-stone-200">
-                        Cấp quyền tự động & Bảo mật danh tính
-                      </p>
-                      <p className="text-[11.5px] leading-relaxed text-stone-500 dark:text-stone-400">
-                        Tác giả và Ban quản trị chỉ cần đăng nhập bằng tài khoản Gmail của mình. Hệ thống sẽ tự động xác thực và kích hoạt toàn quyền Tác giả & Quản trị viên mà không công khai danh sách tài khoản.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Tab 2: Biệt hiệu Độc giả (Instant nickname login - no password or OAuth needed) */}
               {activeTab === 'guest' && (
                 <form onSubmit={handleGuestSubmit} className="space-y-4 pt-1">
@@ -382,7 +359,7 @@ export const AuthModal: React.FC = () => {
                       type="text"
                       value={guestNickname}
                       onChange={(e) => setGuestNickname(e.target.value)}
-                      placeholder="Ví dụ: Tiểu Mộc, Độc giả tháng Năm, Bé Bắp..."
+                      placeholder="Ví dụ: Mây, Mưa, sấm, Chớp,...."
                       className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
@@ -391,7 +368,7 @@ export const AuthModal: React.FC = () => {
                     type="submit"
                     className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-medium text-xs sm:text-sm shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <span>Vào đọc & bình luận ngay 🌸</span>
+                    <span>Vào ngay 🌸</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </form>
@@ -410,7 +387,7 @@ export const AuthModal: React.FC = () => {
                       required
                       value={emailOrUsername}
                       onChange={(e) => setEmailOrUsername(e.target.value)}
-                      placeholder="Ví dụ: tieumoclan hoặc email@gmail.com"
+                      placeholder="Ví dụ: mellifluous07 hoặc mellifluous@gmail.com"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
@@ -453,7 +430,7 @@ export const AuthModal: React.FC = () => {
                       type="text"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Ví dụ: Tiểu Mộc Lan, Bạn đọc yêu truyện..."
+                      placeholder="Ví dụ: Gái già lắm chiêu..."
                       className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
@@ -467,7 +444,7 @@ export const AuthModal: React.FC = () => {
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Viết liền không dấu (vd: tieumoclan, bemeo...)"
+                      placeholder="Viết liền không dấu (vd: anthittraidep, lesnamgaynu...)"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
