@@ -628,15 +628,13 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
 
             {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-3">
-              {chapters.length > 0 ? (
-                <>
               <button
                 type="button"
-                onClick={() => onSelectChapter(chapters[0].chapterNumber)}
+                onClick={() => onSelectChapter(1)}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-sm font-medium shadow-sm transition-all flex items-center gap-2 cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
-                <span>Đọc từ Chương {chapters[0].chapterNumber}</span>
+                <span>Đọc từ Chương 1 (Chính truyện)</span>
               </button>
 
               {latestExtraChapter && (
@@ -652,17 +650,11 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
 
               <button
                 type="button"
-                onClick={() => onSelectChapter(chapters[chapters.length - 1].chapterNumber)}
+                onClick={() => onSelectChapter(chapters[chapters.length - 1]?.chapterNumber || 1)}
                 className="px-5 py-2.5 rounded-xl bg-pink-50 dark:bg-stone-700 text-pink-700 dark:text-pink-300 hover:bg-pink-100 text-sm font-medium transition-colors cursor-pointer"
               >
                 Đọc chương mới nhất
               </button>
-                </>
-              ) : (
-                <div className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-xs italic">
-                  Tác phẩm mới được tạo — chưa có chương nào được đăng tải.
-                </div>
-              )}          
             </div>
           </div>
         </div>
