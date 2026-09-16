@@ -31,7 +31,9 @@ export const AuthModal: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'google' | 'guest' | 'email_login' | 'email_register'>('google');
   const [guestNickname, setGuestNickname] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -75,22 +77,43 @@ export const AuthModal: React.FC = () => {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    if (!email.trim() || !password.trim()) {
-      setErrorMsg('Vui lòng điền đầy đủ email và mật khẩu.');
-      return;
+
+    if (activeTab === 'email_login') {
+      if (!emailOrUsername.trim() || !password.trim()) {
+        setErrorMsg('Vui lòng điền Email (hoặc Tên đăng nhập) và Mật khẩu.');
+        return;
+      }
+    } else {
+      if (!email.trim() || !password.trim()) {
+        setErrorMsg('Vui lòng điền đầy đủ Email và Mật khẩu.');
+        return;
+      }
+      if (password.length < 6) {
+        setErrorMsg('Mật khẩu cần ít nhất 6 ký tự.');
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
       if (activeTab === 'email_login') {
-        await signInWithEmail(email, password);
+        await signInWithEmail(emailOrUsername, password);
       } else {
-        await registerWithEmail(email, password, displayName);
+        await registerWithEmail(email, password, displayName, username);
       }
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setErrorMsg('Email hoặc mật khẩu không chính xác.');
+      if (
+        err.code === 'auth/operation-not-allowed' ||
+        err.message?.includes('operation-not-allowed')
+      ) {
+        setErrorMsg('Tính năng tài khoản đang được đồng bộ qua hệ thống lưu trữ độc quyền Mellifluous. Bạn có thể đăng nhập Google hoặc nhập Biệt hiệu để vào ngay!');
+      } else if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
+        setErrorMsg('Email/tên đăng nhập hoặc mật khẩu không chính xác.');
       } else if (err.code === 'auth/email-already-in-use') {
         setErrorMsg('Email này đã được đăng ký. Vui lòng chuyển sang tab Đăng nhập.');
       } else if (err.code === 'auth/weak-password') {
@@ -375,23 +398,79 @@ export const AuthModal: React.FC = () => {
               )}
 
               {/* Tab 3 & 4: Email Login / Register */}
-              {(activeTab === 'email_login' || activeTab === 'email_register') && (
+              {activeTab === 'email_login' && (
                 <form onSubmit={handleEmailSubmit} className="space-y-3 pt-1">
-                  {activeTab === 'email_register' && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
-                        <User className="w-3.5 h-3.5 text-pink-500" />
-                        <span>Tên hiển thị / Biệt hiệu:</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="Ví dụ: Tiểu Mộc Lan, Bạn đọc yêu truyện..."
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-pink-500" />
+                      <span>Email hoặc Tên đăng nhập:</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={emailOrUsername}
+                      onChange={(e) => setEmailOrUsername(e.target.value)}
+                      placeholder="Ví dụ: tieumoclan hoặc email@gmail.com"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                      <Lock className="w-3.5 h-3.5 text-pink-500" />
+                      <span>Mật khẩu:</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-medium text-xs sm:text-sm shadow-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+              )}
+
+              {activeTab === 'email_register' && (
+                <form onSubmit={handleEmailSubmit} className="space-y-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-pink-500" />
+                      <span>Tên hiển thị / Biệt hiệu:</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Ví dụ: Tiểu Mộc Lan, Bạn đọc yêu truyện..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                      <span>Tên đăng nhập (Username):</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Viết liền không dấu (vd: tieumoclan, bemeo...)"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs sm:text-sm text-stone-800 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-pink-400"
+                    />
+                  </div>
 
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
@@ -429,13 +508,7 @@ export const AuthModal: React.FC = () => {
                     disabled={isLoading}
                     className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-medium text-xs sm:text-sm shadow-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                   >
-                    <span>
-                      {isLoading
-                        ? 'Đang xử lý...'
-                        : activeTab === 'email_login'
-                        ? 'Đăng nhập'
-                        : 'Tạo tài khoản mới'}
-                    </span>
+                    <span>{isLoading ? 'Đang khởi tạo...' : 'Tạo tài khoản mới'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </form>

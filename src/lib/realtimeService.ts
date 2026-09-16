@@ -519,11 +519,15 @@ export const subscribeToComments = (
           text: item.text,
           createdAt: item.createdAt || new Date().toISOString(),
           rating: item.rating,
+          likes: typeof item.likes === 'number' ? item.likes : 0,
+          likedBy: Array.isArray(item.likedBy) ? item.likedBy : [],
           replies: (item.replies || []).map((r: any) => ({
             ...r,
             isAuthor: Boolean(r.isAuthor),
             isCollaborator: Boolean(r.isCollaborator),
             roleBadge: r.roleBadge || (r.isAuthor ? 'Tác giả' : r.isCollaborator ? 'Cộng sự' : undefined),
+            likes: typeof r.likes === 'number' ? r.likes : 0,
+            likedBy: Array.isArray(r.likedBy) ? r.likedBy : [],
           })),
         });
       });
@@ -576,6 +580,8 @@ export const postRealtimeComment = async (comment: {
       avatar: comment.avatar || (comment.isAuthor ? '🌸' : comment.isCollaborator ? '🌿' : '🌸'),
       text: comment.text.trim(),
       rating: comment.rating || null,
+      likes: 0,
+      likedBy: [],
       replies: [],
       createdAt: new Date().toISOString(),
     });
@@ -642,6 +648,8 @@ export const postCommentReply = async (
     isCollaborator: Boolean(reply.isCollaborator),
     roleBadge: reply.roleBadge || (reply.isAuthor ? 'Tác giả' : reply.isCollaborator ? 'Cộng sự' : undefined),
     userEmail: reply.userEmail || null,
+    likes: 0,
+    likedBy: [],
   };
 
   try {
@@ -668,6 +676,83 @@ export const postCommentReply = async (
   }
 
   return newReplyItem;
+};
+
+/**
+ * Toggle heart / like on a realtime comment by any visitor or user.
+ */
+export const toggleCommentLike = async (
+  commentId: string,
+  visitorId: string
+): Promise<{ likes: number; isLiked: boolean }> => {
+  try {
+    const commentRef = doc(db, 'comments', commentId);
+    const snap = await getDoc(commentRef);
+    if (!snap.exists()) return { likes: 0, isLiked: false };
+
+    const data = snap.data();
+    const likedBy: string[] = Array.isArray(data.likedBy) ? data.likedBy : [];
+    const hasLiked = likedBy.includes(visitorId);
+
+    const newLikedBy = hasLiked
+      ? likedBy.filter((id) => id !== visitorId)
+      : [...likedBy, visitorId];
+    const newLikes = Math.max(0, newLikedBy.length);
+
+    await updateDoc(commentRef, {
+      likes: newLikes,
+      likedBy: newLikedBy,
+    });
+
+    return { likes: newLikes, isLiked: !hasLiked };
+  } catch (err) {
+    console.warn('Toggle comment like error:', err);
+    return { likes: 0, isLiked: false };
+  }
+};
+
+/**
+ * Toggle heart / like on a nested comment reply by any visitor or user.
+ */
+export const toggleReplyLike = async (
+  commentId: string,
+  replyId: string,
+  visitorId: string
+): Promise<{ likes: number; isLiked: boolean }> => {
+  try {
+    const commentRef = doc(db, 'comments', commentId);
+    const snap = await getDoc(commentRef);
+    if (!snap.exists()) return { likes: 0, isLiked: false };
+
+    const data = snap.data();
+    const currentReplies: CommentReply[] = data.replies || [];
+    let isLikedNow = false;
+    let finalLikes = 0;
+
+    const updatedReplies = currentReplies.map((r) => {
+      if (r.id === replyId) {
+        const likedBy = Array.isArray(r.likedBy) ? r.likedBy : [];
+        const hasLiked = likedBy.includes(visitorId);
+        const newLikedBy = hasLiked
+          ? likedBy.filter((id) => id !== visitorId)
+          : [...likedBy, visitorId];
+        const newLikes = Math.max(0, newLikedBy.length);
+        isLikedNow = !hasLiked;
+        finalLikes = newLikes;
+        return { ...r, likes: newLikes, likedBy: newLikedBy };
+      }
+      return r;
+    });
+
+    await updateDoc(commentRef, {
+      replies: updatedReplies,
+    });
+
+    return { likes: finalLikes, isLiked: isLikedNow };
+  } catch (err) {
+    console.warn('Toggle reply like error:', err);
+    return { likes: 0, isLiked: false };
+  }
 };
 
 /**
@@ -1597,22 +1682,126 @@ export const clearAllStoriesAndChapters = async (): Promise<void> => {
 
 const LOCAL_COLLABORATORS_KEY = 'mel_collaborators_cache';
 
+export const INITIAL_COLLABORATOR_SEEDS: CollaboratorItem[] = [
+  {
+    id: 'collab_cuncondangiu07_gmail_com',
+    email: 'cuncondangiu07@gmail.com',
+    displayName: 'Mellifluous (Tác giả chính)',
+    role: 'author',
+    roleTitle: 'Tác giả chính • Mellifluous',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Tác giả & Dịch giả chính',
+  },
+  {
+    id: 'collab_meomeoxinhxinh07_gmail_com',
+    email: 'meomeoxinhxinh07@gmail.com',
+    displayName: 'Mèo Con (Tác giả)',
+    role: 'author',
+    roleTitle: 'Tác giả • Mellifluous',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Đồng tác giả & Biên dịch',
+  },
+  {
+    id: 'collab_nhatlinhpham010194_gmail_com',
+    email: 'nhatlinhpham010194@gmail.com',
+    displayName: 'Nhật Linh (Admin)',
+    role: 'admin',
+    roleTitle: 'Quản trị viên hệ thống',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Kỹ thuật & Quản trị hệ thống',
+  },
+  {
+    id: 'collab_maianhpham927_gmail_com',
+    email: 'maianhpham927@gmail.com',
+    displayName: 'Mai Anh (Biên tập)',
+    role: 'editor',
+    roleTitle: 'Biên tập viên / Editor',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Hiệu đính & Soát lỗi chương',
+  },
+  {
+    id: 'collab_duongtieuvi102_gmail_com',
+    email: 'duongtieuvi102@gmail.com',
+    displayName: 'Tiểu Vi (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Hỗ trợ duyệt bài & hồi âm',
+  },
+  {
+    id: 'collab_nguyenplinh1002_gmail_com',
+    email: 'nguyenplinh1002@gmail.com',
+    displayName: 'Phương Linh (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Cộng tác viên nội dung',
+  },
+  {
+    id: 'collab_nguyenlinhph0210_gmail_com',
+    email: 'nguyenlinhph0210@gmail.com',
+    displayName: 'Linh Nguyễn (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Hỗ trợ kiểm tra chương',
+  },
+  {
+    id: 'collab_luclamly920_gmail_com',
+    email: 'luclamly920@gmail.com',
+    displayName: 'Lục Lam Ly (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Cộng tác viên biên tập',
+  },
+  {
+    id: 'collab_uongthienyenvi123_gmail_com',
+    email: 'uongthienyenvi123@gmail.com',
+    displayName: 'Yến Vi (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Cộng tác viên đọc & rà soát',
+  },
+  {
+    id: 'collab_vivi60810_gmail_com',
+    email: 'vivi60810@gmail.com',
+    displayName: 'Vivi (Cộng sự)',
+    role: 'collaborator',
+    roleTitle: 'Cộng sự Ban quản trị',
+    addedBy: 'Hệ thống sáng lập',
+    addedAt: '2025-01-01T00:00:00.000Z',
+    note: 'Cộng tác viên hỗ trợ độc giả',
+  },
+];
+
 export const getStoredCollaborators = (): CollaboratorItem[] => {
   try {
     const raw = localStorage.getItem(LOCAL_COLLABORATORS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
-  return [];
+  return INITIAL_COLLABORATOR_SEEDS;
 };
 
 export const subscribeToCollaborators = (
   callback: (list: CollaboratorItem[]) => void
 ): (() => void) => {
   // Emit local cache first for instant UI response
-  callback(getStoredCollaborators());
+  const initial = getStoredCollaborators();
+  callback(initial);
 
   const colRef = collection(db, COLLABORATORS_COLLECTION);
   return onSnapshot(
@@ -1632,11 +1821,20 @@ export const subscribeToCollaborators = (
           note: data.note || '',
         });
       });
+
+      // Merge with initial seeds if snapshot is empty or to ensure core admins exist
+      const mergedList = [...list];
+      for (const seed of INITIAL_COLLABORATOR_SEEDS) {
+        if (!mergedList.some((c) => c.email.toLowerCase() === seed.email.toLowerCase())) {
+          mergedList.push(seed);
+        }
+      }
+
       // Cache locally
       try {
-        localStorage.setItem(LOCAL_COLLABORATORS_KEY, JSON.stringify(list));
+        localStorage.setItem(LOCAL_COLLABORATORS_KEY, JSON.stringify(mergedList));
       } catch {}
-      callback(list);
+      callback(mergedList);
     },
     (err) => {
       console.warn('Collaborators snapshot warning (using local):', err);
@@ -1659,7 +1857,7 @@ export const addCollaborator = async (
 
   // 1. Update local cache
   const current = getStoredCollaborators();
-  const updated = [...current.filter((c) => c.email !== cleanEmail), newCollab];
+  const updated = [...current.filter((c) => c.email.toLowerCase() !== cleanEmail), newCollab];
   try {
     localStorage.setItem(LOCAL_COLLABORATORS_KEY, JSON.stringify(updated));
   } catch {}
@@ -1677,7 +1875,7 @@ export const addCollaborator = async (
 export const deleteCollaborator = async (collabId: string): Promise<void> => {
   // 1. Update local cache
   const current = getStoredCollaborators();
-  const updated = current.filter((c) => c.id !== collabId && c.email !== collabId);
+  const updated = current.filter((c) => c.id !== collabId && c.email.toLowerCase() !== collabId.toLowerCase());
   try {
     localStorage.setItem(LOCAL_COLLABORATORS_KEY, JSON.stringify(updated));
   } catch {}
@@ -1697,7 +1895,7 @@ export const updateCollaboratorRole = async (
 ): Promise<void> => {
   const current = getStoredCollaborators();
   const updated = current.map((c) => {
-    if (c.id === collabId || c.email === collabId) {
+    if (c.id === collabId || c.email.toLowerCase() === collabId.toLowerCase()) {
       return { ...c, role, roleTitle: roleTitle || c.roleTitle };
     }
     return c;
@@ -1714,6 +1912,131 @@ export const updateCollaboratorRole = async (
     );
   } catch (err) {
     console.warn('Firestore update collaborator role warning:', err);
+  }
+};
+
+/**
+ * Full update for Collaborator / Author / Admin item (Name, Email, Role, Note)
+ */
+export const updateCollaboratorFullData = async (
+  collabId: string,
+  data: Partial<Omit<CollaboratorItem, 'id'>>
+): Promise<CollaboratorItem | null> => {
+  const current = getStoredCollaborators();
+  let updatedCollab: CollaboratorItem | null = null;
+  const updated = current.map((c) => {
+    if (c.id === collabId || c.email.toLowerCase() === collabId.toLowerCase()) {
+      updatedCollab = {
+        ...c,
+        ...data,
+      } as CollaboratorItem;
+      return updatedCollab;
+    }
+    return c;
+  });
+  try {
+    localStorage.setItem(LOCAL_COLLABORATORS_KEY, JSON.stringify(updated));
+  } catch {}
+
+  try {
+    await setDoc(
+      doc(db, COLLABORATORS_COLLECTION, collabId),
+      { ...data, updatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Firestore update collaborator warning:', err);
+  }
+
+  return updatedCollab;
+};
+
+// =========================================================================
+// 9. USERNAME TO EMAIL DIRECTORY (USERNAME LOGIN & REGISTRATION)
+// =========================================================================
+
+const USERNAMES_COLLECTION = 'usernames';
+const LOCAL_USERNAMES_KEY = 'mel_usernames_cache';
+
+export const getStoredUsernames = (): Record<string, string> => {
+  try {
+    const raw = localStorage.getItem(LOCAL_USERNAMES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+};
+
+export const registerUsernameMapping = async (
+  username: string,
+  email: string,
+  uid?: string
+): Promise<void> => {
+  const cleanUsername = username.toLowerCase().trim();
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Local storage
+  const current = getStoredUsernames();
+  current[cleanUsername] = cleanEmail;
+  try {
+    localStorage.setItem(LOCAL_USERNAMES_KEY, JSON.stringify(current));
+  } catch {}
+
+  // 2. Firestore
+  try {
+    await setDoc(doc(db, USERNAMES_COLLECTION, cleanUsername), {
+      username: cleanUsername,
+      email: cleanEmail,
+      uid: uid || null,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('Register username mapping warning:', err);
+  }
+};
+
+export const lookupEmailByUsername = async (
+  username: string
+): Promise<string | null> => {
+  const cleanUsername = username.toLowerCase().trim();
+
+  // 1. Check local cache
+  const localMap = getStoredUsernames();
+  if (localMap[cleanUsername]) {
+    return localMap[cleanUsername];
+  }
+
+  // 2. Check Firestore
+  try {
+    const snap = await getDoc(doc(db, USERNAMES_COLLECTION, cleanUsername));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.email) {
+        localMap[cleanUsername] = data.email;
+        try {
+          localStorage.setItem(LOCAL_USERNAMES_KEY, JSON.stringify(localMap));
+        } catch {}
+        return data.email;
+      }
+    }
+  } catch (err) {
+    console.warn('Lookup email by username warning:', err);
+  }
+
+  return null;
+};
+
+export const checkUsernameAvailable = async (
+  username: string
+): Promise<boolean> => {
+  const cleanUsername = username.toLowerCase().trim();
+  const localMap = getStoredUsernames();
+  if (localMap[cleanUsername]) return false;
+
+  try {
+    const snap = await getDoc(doc(db, USERNAMES_COLLECTION, cleanUsername));
+    return !snap.exists();
+  } catch {
+    return true;
   }
 };
 
@@ -1786,4 +2109,131 @@ export const subscribeToUserProfile = (
     }
   );
 };
+
+// Account Credentials & Lookup helpers (Seamless Firestore authentication)
+export interface StoredUserAccount extends UserProfile {
+  passwordHash?: string;
+  salt?: string;
+  authProvider?: string;
+  createdAt?: string;
+}
+
+export const findUserByEmail = async (email: string): Promise<StoredUserAccount | null> => {
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. First check if any user has this email in localStorage
+  try {
+    const cachedUid = localStorage.getItem(`mel_email_to_uid_${cleanEmail}`);
+    if (cachedUid) {
+      const cachedProfile = localStorage.getItem(`mel_account_${cachedUid}`);
+      if (cachedProfile) {
+        return JSON.parse(cachedProfile);
+      }
+    }
+  } catch {}
+
+  // 2. Query Firestore users collection by email
+  try {
+    const q = query(
+      collection(db, USERS_COLLECTION),
+      where('email', '==', cleanEmail),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const docData = snap.docs[0].data() as StoredUserAccount;
+      try {
+        localStorage.setItem(`mel_email_to_uid_${cleanEmail}`, docData.uid);
+        localStorage.setItem(`mel_account_${docData.uid}`, JSON.stringify(docData));
+      } catch {}
+      return docData;
+    }
+  } catch (err) {
+    console.warn('Find user by email warning:', err);
+  }
+
+  // 3. Fallback: Check if document ID matches email-derived key
+  try {
+    const directDoc = await getDoc(doc(db, USERS_COLLECTION, `usr_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`));
+    if (directDoc.exists()) {
+      return directDoc.data() as StoredUserAccount;
+    }
+  } catch {}
+
+  return null;
+};
+
+export const findUserByUsername = async (username: string): Promise<StoredUserAccount | null> => {
+  const cleanUsername = username.toLowerCase().trim();
+
+  // 1. Check usernames collection mapping
+  try {
+    const usernameSnap = await getDoc(doc(db, USERNAMES_COLLECTION, cleanUsername));
+    if (usernameSnap.exists()) {
+      const uData = usernameSnap.data();
+      if (uData.uid) {
+        const userSnap = await getDoc(doc(db, USERS_COLLECTION, uData.uid));
+        if (userSnap.exists()) {
+          return userSnap.data() as StoredUserAccount;
+        }
+      }
+      if (uData.email) {
+        return await findUserByEmail(uData.email);
+      }
+    }
+  } catch (err) {
+    console.warn('Find user by username mapping warning:', err);
+  }
+
+  // 2. Direct query on users collection where username == cleanUsername
+  try {
+    const q = query(
+      collection(db, USERS_COLLECTION),
+      where('username', '==', cleanUsername),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs[0].data() as StoredUserAccount;
+    }
+  } catch (err) {
+    console.warn('Query user by username warning:', err);
+  }
+
+  return null;
+};
+
+export const checkEmailAvailable = async (email: string): Promise<boolean> => {
+  const found = await findUserByEmail(email);
+  return !found;
+};
+
+export const saveUserAccount = async (account: StoredUserAccount): Promise<void> => {
+  // Cache locally
+  try {
+    localStorage.setItem(`mel_account_${account.uid}`, JSON.stringify(account));
+    localStorage.setItem(`mel_profile_${account.uid}`, JSON.stringify(account));
+    localStorage.setItem(`mel_email_to_uid_${account.email.toLowerCase().trim()}`, account.uid);
+  } catch {}
+
+  // Save to Firestore users collection
+  try {
+    await setDoc(
+      doc(db, USERS_COLLECTION, account.uid),
+      {
+        ...account,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Save user account to Firestore warning:', err);
+  }
+
+  // If username provided, also record in usernames directory
+  if (account.username) {
+    await registerUsernameMapping(account.username, account.email, account.uid);
+  }
+};
+
 

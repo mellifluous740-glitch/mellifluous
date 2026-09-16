@@ -5,6 +5,8 @@ import {
   postRealtimeComment,
   postCommentReply,
   deleteComment,
+  toggleCommentLike,
+  toggleReplyLike,
   subscribeToStoryStats,
   toggleStoryLike,
   recordStoryView,
@@ -428,6 +430,29 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     }
   };
 
+  const getVisitorId = () => {
+    try {
+      let id = localStorage.getItem('mel_visitor_uuid');
+      if (!id) {
+        id = 'v_' + Math.random().toString(36).slice(2, 11);
+        localStorage.setItem('mel_visitor_uuid', id);
+      }
+      return id;
+    } catch {
+      return 'guest_' + Date.now();
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: string) => {
+    const visitorId = user?.uid || user?.email || getVisitorId();
+    await toggleCommentLike(commentId, visitorId);
+  };
+
+  const handleToggleReplyLike = async (commentId: string, replyId: string) => {
+    const visitorId = user?.uid || user?.email || getVisitorId();
+    await toggleReplyLike(commentId, replyId, visitorId);
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Xác nhận xóa bình luận này?')) return;
     try {
@@ -494,284 +519,288 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* FULLY INTEGRATED UNIFIED STICKY READER TOOLBAR                            */}
+      {/* FULLY INTEGRATED UNIFIED STICKY READER TOOLBAR & EYE PROTECTION CONTROLS  */}
       {/* ========================================================================= */}
-      <header
-        id="reader-sticky-toolbar"
-        className={`sticky top-14 sm:top-16 z-30 w-full p-2 sm:p-2.5 rounded-2xl backdrop-blur-md border shadow-xs transition-all duration-300 ${
-          isSettingsOpen ? 'mb-3.5 sm:mb-4' : 'mb-6 sm:mb-8 lg:mb-10'
-        } ${currentTheme.navBg} ${currentTheme.navBorder}`}
-      >
-        <div className="flex items-center justify-between gap-1 sm:gap-2 w-full">
-          {/* 1. Left Group: Về trang chủ & Chương trước */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Về trang chủ */}
-            <button
-              type="button"
-              onClick={onBack}
-              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
-              title="Thoát trình đọc để quay về trang chủ"
-              aria-label="Về trang chủ"
-            >
-              <Home className="w-4 h-4 text-pink-500 shrink-0" />
-              <span className="hidden md:inline">Trang chủ</span>
-            </button>
-
-            {/* Chương trước */}
-            <button
-              type="button"
-              disabled={!prevChapter}
-              onClick={() => prevChapter && onSelectChapter(prevChapter.chapterNumber)}
-              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors ${
-                prevChapter
-                  ? `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder} cursor-pointer`
-                  : 'opacity-35 cursor-not-allowed border-stone-200 dark:border-stone-800'
-              }`}
-              title={prevChapter ? `Chương trước: Chương ${prevChapter.chapterNumber}` : 'Đây là chương đầu tiên'}
-              aria-label="Chương trước"
-            >
-              <ChevronLeft className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Trước</span>
-            </button>
-          </div>
-
-          {/* 2. Center: Nút Mục lục nhanh & Tên chương (Mở drawer mục lục, KHÔNG redirect) */}
-          <button
-            type="button"
-            onClick={() => setIsTocOpen(true)}
-            className={`flex-1 min-w-0 max-w-xl px-2 sm:px-3 py-1.5 rounded-xl border flex items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.cardBorder}`}
-            title="Mở mục lục tất cả các chương"
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500 shrink-0" />
-            <div className="min-w-0 flex-1 text-center truncate">
-              <span className={`block font-serif text-[11px] sm:text-xs md:text-sm font-bold truncate leading-tight ${currentTheme.textColor}`}>
-                <span className="text-pink-600 dark:text-pink-400 font-sans mr-1">
-                  {chapter.isExtra || chapter.partType === 'extra'
-                    ? `🌸 PN.${chapter.extraNumber || ''}:`
-                    : `C.${chapter.chapterNumber}/${story.mainChaptersCount || 40}:`}
-                </span>
-                {chapter.title.replace(/^(Chương|Phiên ngoại)\s*[\w\d.]+:\s*/i, '')}
-              </span>
-              <span className={`hidden xs:block text-[10px] truncate leading-tight opacity-75 ${currentTheme.subtextColor}`}>
-                {story.title}
-              </span>
-            </div>
-            <ChevronDown className={`w-3.5 h-3.5 shrink-0 opacity-60 ${currentTheme.textColor}`} />
-          </button>
-
-          {/* 3. Right Group: Chương sau & Cài đặt bảo vệ mắt */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Chương sau */}
-            <button
-              type="button"
-              disabled={!nextChapter}
-              onClick={() => nextChapter && onSelectChapter(nextChapter.chapterNumber)}
-              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors ${
-                nextChapter
-                  ? 'bg-rose-500 hover:bg-rose-600 text-white border-rose-600 shadow-2xs cursor-pointer'
-                  : 'opacity-35 cursor-not-allowed border-stone-200 dark:border-stone-800'
-              }`}
-              title={nextChapter ? `Chương sau: Chương ${nextChapter.chapterNumber}` : 'Đây là chương mới nhất'}
-              aria-label="Chương sau"
-            >
-              <span className="hidden sm:inline">Sau</span>
-              <ChevronRight className="w-4 h-4 shrink-0" />
-            </button>
-
-            {/* Văn án (màn hình lớn) */}
-            {onOpenStoryDetail && (
+      <div className="sticky top-14 sm:top-16 z-30 w-full mb-6 sm:mb-8">
+        <header
+          id="reader-sticky-toolbar"
+          className={`w-full p-2 sm:p-2.5 rounded-2xl backdrop-blur-md border shadow-xs transition-all duration-300 ${currentTheme.navBg} ${currentTheme.navBorder}`}
+        >
+          <div className="flex items-center justify-between gap-1 sm:gap-2 w-full">
+            {/* 1. Left Group: Về trang chủ & Chương trước */}
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Về trang chủ */}
               <button
                 type="button"
-                onClick={onOpenStoryDetail}
-                className={`hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.subtextColor} ${currentTheme.cardBorder}`}
-                title="Xem văn án tác phẩm"
+                onClick={onBack}
+                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                title="Thoát trình đọc để quay về trang chủ"
+                aria-label="Về trang chủ"
               >
-                <BookMarked className="w-3.5 h-3.5" />
-                <span>Văn án</span>
+                <Home className="w-4 h-4 text-pink-500 shrink-0" />
+                <span className="hidden md:inline">Trang chủ</span>
               </button>
-            )}
 
-            {/* Nút Bảo vệ mắt & Cỡ chữ */}
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-all cursor-pointer shrink-0 ${
-                isSettingsOpen
-                  ? 'bg-pink-500 text-white border-pink-600 shadow-2xs'
-                  : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
-              }`}
-              title="Đổi màu nền bảo vệ mắt & tùy chỉnh hiển thị"
-              aria-label="Cài đặt đọc truyện bảo vệ mắt"
-            >
-              <Eye className="w-4 h-4 text-pink-500 shrink-0" />
-              <span className="hidden md:inline">Bảo vệ mắt</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ========================================================================= */}
-      {/* EYE PROTECTION SETTINGS PANEL (FULLY RESPONSIVE ON PHONE & TABLET)        */}
-      {/* ========================================================================= */}
-      {isSettingsOpen && (
-        <section
-          aria-label="Cài đặt bảo vệ mắt"
-          className={`w-full mb-6 sm:mb-8 lg:mb-10 p-3.5 sm:p-5 rounded-2xl border shadow-md space-y-3.5 sm:space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 transition-colors ${currentTheme.cardBg} ${currentTheme.cardBorder}`}
-        >
-          <div className="flex items-center justify-between border-b pb-2.5" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
-            <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-pink-500 shrink-0" />
-              <h3 className={`font-serif text-xs sm:text-sm font-bold ${currentTheme.textColor}`}>
-                Chế độ màu nền bảo vệ mắt & Tùy chỉnh đọc truyện
-              </h3>
+              {/* Chương trước */}
+              <button
+                type="button"
+                disabled={!prevChapter}
+                onClick={() => prevChapter && onSelectChapter(prevChapter.chapterNumber)}
+                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors ${
+                  prevChapter
+                    ? `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder} cursor-pointer`
+                    : 'opacity-35 cursor-not-allowed border-stone-200 dark:border-stone-800'
+                }`}
+                title={prevChapter ? `Chương trước: Chương ${prevChapter.chapterNumber}` : 'Đây là chương đầu tiên'}
+                aria-label="Chương trước"
+              >
+                <ChevronLeft className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Trước</span>
+              </button>
             </div>
+
+            {/* 2. Center: Nút Mục lục nhanh & Tên chương (Mở drawer mục lục, KHÔNG redirect) */}
             <button
               type="button"
+              onClick={() => setIsTocOpen(true)}
+              className={`flex-1 min-w-0 max-w-xl px-2 sm:px-3 py-1.5 rounded-xl border flex items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.cardBorder}`}
+              title="Mở mục lục tất cả các chương"
+            >
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500 shrink-0" />
+              <div className="min-w-0 flex-1 text-center truncate">
+                <span className={`block font-serif text-[11px] sm:text-xs md:text-sm font-bold truncate leading-tight ${currentTheme.textColor}`}>
+                  <span className="text-pink-600 dark:text-pink-400 font-sans mr-1">
+                    {chapter.isExtra || chapter.partType === 'extra'
+                      ? `🌸 PN.${chapter.extraNumber || ''}:`
+                      : `C.${chapter.chapterNumber}/${story.mainChaptersCount || 40}:`}
+                  </span>
+                  {chapter.title.replace(/^(Chương|Phiên ngoại)\s*[\w\d.]+:\s*/i, '')}
+                </span>
+                <span className={`hidden xs:block text-[10px] truncate leading-tight opacity-75 ${currentTheme.subtextColor}`}>
+                  {story.title}
+                </span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 shrink-0 opacity-60 ${currentTheme.textColor}`} />
+            </button>
+
+            {/* 3. Right Group: Chương sau & Cài đặt bảo vệ mắt */}
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Chương sau */}
+              <button
+                type="button"
+                disabled={!nextChapter}
+                onClick={() => nextChapter && onSelectChapter(nextChapter.chapterNumber)}
+                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-colors ${
+                  nextChapter
+                    ? 'bg-rose-500 hover:bg-rose-600 text-white border-rose-600 shadow-2xs cursor-pointer'
+                    : 'opacity-35 cursor-not-allowed border-stone-200 dark:border-stone-800'
+                }`}
+                title={nextChapter ? `Chương sau: Chương ${nextChapter.chapterNumber}` : 'Đây là chương mới nhất'}
+                aria-label="Chương sau"
+              >
+                <span className="hidden sm:inline">Sau</span>
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              </button>
+
+              {/* Văn án (màn hình lớn) */}
+              {onOpenStoryDetail && (
+                <button
+                  type="button"
+                  onClick={onOpenStoryDetail}
+                  className={`hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.subtextColor} ${currentTheme.cardBorder}`}
+                  title="Xem văn án tác phẩm"
+                >
+                  <BookMarked className="w-3.5 h-3.5" />
+                  <span>Văn án</span>
+                </button>
+              )}
+
+              {/* Nút Bảo vệ mắt & Cỡ chữ */}
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-all cursor-pointer shrink-0 ${
+                  isSettingsOpen
+                    ? 'bg-pink-500 text-white border-pink-600 shadow-2xs'
+                    : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                }`}
+                title="Đổi màu nền bảo vệ mắt & tùy chỉnh hiển thị"
+                aria-label="Cài đặt đọc truyện bảo vệ mắt"
+              >
+                <Eye className="w-4 h-4 text-pink-500 shrink-0" />
+                <span className="hidden md:inline">Bảo vệ mắt</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* EYE PROTECTION SETTINGS FLOATING POPOVER (ALWAYS IN VIEW, ATTACHED UNDER TOOLBAR) */}
+        {isSettingsOpen && (
+          <div className="relative mt-2 z-40">
+            <div
+              className="fixed inset-0 -z-10 bg-black/25 backdrop-blur-[1px]"
               onClick={() => setIsSettingsOpen(false)}
-              className={`p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 ${currentTheme.subtextColor} cursor-pointer`}
-              aria-label="Đóng cài đặt"
+            />
+            <section
+              aria-label="Cài đặt bảo vệ mắt"
+              className={`w-full max-h-[75vh] overflow-y-auto p-3.5 sm:p-5 rounded-2xl border shadow-xl space-y-3.5 sm:space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 transition-colors ${currentTheme.cardBg} ${currentTheme.cardBorder}`}
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+              <div className="flex items-center justify-between border-b pb-2.5" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-pink-500 shrink-0" />
+                  <h3 className={`font-serif text-xs sm:text-sm font-bold ${currentTheme.textColor}`}>
+                    Chế độ màu nền bảo vệ mắt & Tùy chỉnh đọc truyện
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className={`p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 ${currentTheme.subtextColor} cursor-pointer`}
+                  aria-label="Đóng cài đặt"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-          {/* 1. Eye-protection Color Scheme Switcher */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className={`font-medium ${currentTheme.subtextColor}`}>
-                Màu nền công thái học:
-              </span>
-              <span className={`font-serif italic text-[11px] sm:text-xs ${currentTheme.accentColor}`}>
-                {currentTheme.name}
-              </span>
-            </div>
+              {/* 1. Eye-protection Color Scheme Switcher */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={`font-medium ${currentTheme.subtextColor}`}>
+                    Màu nền công thái học:
+                  </span>
+                  <span className={`font-serif italic text-[11px] sm:text-xs ${currentTheme.accentColor}`}>
+                    {currentTheme.name}
+                  </span>
+                </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2">
-              {(Object.keys(READER_THEMES) as ReaderThemeKey[]).map((key) => {
-                const item = READER_THEMES[key];
-                const isSelected = themeKey === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setThemeKey(key)}
-                    className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'ring-2 ring-pink-500 ring-offset-1 border-pink-400 font-bold shadow-xs'
-                        : 'border-stone-200 dark:border-stone-700 hover:border-pink-300'
-                    }`}
-                    style={{ backgroundColor: item.bgHex }}
-                  >
-                    <span
-                      className="w-4 h-4 rounded-full border border-black/15 flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: item.bgHex }}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2">
+                  {(Object.keys(READER_THEMES) as ReaderThemeKey[]).map((key) => {
+                    const item = READER_THEMES[key];
+                    const isSelected = themeKey === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setThemeKey(key)}
+                        className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'ring-2 ring-pink-500 ring-offset-1 border-pink-400 font-bold shadow-xs'
+                            : 'border-stone-200 dark:border-stone-700 hover:border-pink-300'
+                        }`}
+                        style={{ backgroundColor: item.bgHex }}
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full border border-black/15 flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: item.bgHex }}
+                        >
+                          {isSelected && <Check className="w-2.5 h-2.5 text-pink-600 dark:text-pink-400 stroke-[3]" />}
+                        </span>
+                        <span className="text-[11px] sm:text-xs text-stone-900 font-serif truncate leading-tight">
+                          {item.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Font Size, Font Family, Line Height & Width Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+                {/* Font Size Adjuster */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={currentTheme.subtextColor}>Cỡ chữ đọc truyện:</span>
+                    <span className={`font-mono font-bold ${currentTheme.textColor}`}>{fontSize}px</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFontSize((s) => Math.max(14, s - 1))}
+                      className={`flex-1 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
                     >
-                      {isSelected && <Check className="w-2.5 h-2.5 text-pink-600 dark:text-pink-400 stroke-[3]" />}
-                    </span>
-                    <span className="text-[11px] sm:text-xs text-stone-900 font-serif truncate leading-tight">
-                      {item.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      A-
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontSize(17)}
+                      title="Đặt lại cỡ chữ chuẩn (17px)"
+                      className={`px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.subtextColor} ${currentTheme.cardBorder}`}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontSize((s) => Math.min(26, s + 1))}
+                      className={`flex-1 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
+                    >
+                      A+
+                    </button>
+                  </div>
+                </div>
+
+                {/* Font Family (Serif vs Sans) */}
+                <div className="space-y-1.5">
+                  <span className={`block text-xs ${currentTheme.subtextColor}`}>Kiểu chữ:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFontFamily('serif')}
+                      className={`py-1.5 px-2 rounded-xl border text-xs font-serif transition-colors cursor-pointer ${
+                        fontFamily === 'serif'
+                          ? 'bg-pink-500 text-white border-pink-600 font-bold'
+                          : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                      }`}
+                    >
+                      Có chân (Serif)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontFamily('sans')}
+                      className={`py-1.5 px-2 rounded-xl border text-xs font-sans transition-colors cursor-pointer ${
+                        fontFamily === 'sans'
+                          ? 'bg-pink-500 text-white border-pink-600 font-bold'
+                          : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                      }`}
+                    >
+                      Không chân (Sans)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Line Height & Width */}
+                <div className="space-y-1.5">
+                  <span className={`block text-xs ${currentTheme.subtextColor}`}>Giãn dòng & Khung đọc:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLineHeight(lineHeight === 'relaxed' ? 'loose' : 'relaxed')}
+                      className={`flex-1 py-1.5 px-2 rounded-xl border text-xs transition-colors cursor-pointer truncate ${
+                        lineHeight === 'loose'
+                          ? 'bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-300 border-pink-300 font-medium'
+                          : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                      }`}
+                    >
+                      {lineHeight === 'loose' ? 'Giãn dòng: Rộng' : 'Giãn dòng: Chuẩn'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReaderWidth(readerWidth === 'normal' ? 'wide' : 'normal')}
+                      className={`py-1.5 px-2.5 rounded-xl border text-xs transition-colors cursor-pointer shrink-0 ${
+                        readerWidth === 'wide'
+                          ? 'bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-300 border-pink-300 font-medium'
+                          : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                      }`}
+                      title="Chuyển đổi độ rộng trang đọc"
+                    >
+                      {readerWidth === 'wide' ? 'Rộng' : 'Chuẩn'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
-
-          {/* 2. Font Size, Font Family, Line Height & Width Controls */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-            {/* Font Size Adjuster */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className={currentTheme.subtextColor}>Cỡ chữ đọc truyện:</span>
-                <span className={`font-mono font-bold ${currentTheme.textColor}`}>{fontSize}px</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFontSize((s) => Math.max(14, s - 1))}
-                  className={`flex-1 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
-                >
-                  A-
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFontSize(17)}
-                  title="Đặt lại cỡ chữ chuẩn (17px)"
-                  className={`px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.subtextColor} ${currentTheme.cardBorder}`}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFontSize((s) => Math.min(26, s + 1))}
-                  className={`flex-1 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`}
-                >
-                  A+
-                </button>
-              </div>
-            </div>
-
-            {/* Font Family (Serif vs Sans) */}
-            <div className="space-y-1.5">
-              <span className={`block text-xs ${currentTheme.subtextColor}`}>Kiểu chữ:</span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFontFamily('serif')}
-                  className={`py-1.5 px-2 rounded-xl border text-xs font-serif transition-colors cursor-pointer ${
-                    fontFamily === 'serif'
-                      ? 'bg-pink-500 text-white border-pink-600 font-bold'
-                      : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
-                  }`}
-                >
-                  Có chân (Serif)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFontFamily('sans')}
-                  className={`py-1.5 px-2 rounded-xl border text-xs font-sans transition-colors cursor-pointer ${
-                    fontFamily === 'sans'
-                      ? 'bg-pink-500 text-white border-pink-600 font-bold'
-                      : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
-                  }`}
-                >
-                  Không chân (Sans)
-                </button>
-              </div>
-            </div>
-
-            {/* Line Height & Width */}
-            <div className="space-y-1.5">
-              <span className={`block text-xs ${currentTheme.subtextColor}`}>Giãn dòng & Khung đọc:</span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setLineHeight(lineHeight === 'relaxed' ? 'loose' : 'relaxed')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl border text-xs transition-colors cursor-pointer truncate ${
-                    lineHeight === 'loose'
-                      ? 'bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-300 border-pink-300 font-medium'
-                      : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
-                  }`}
-                >
-                  {lineHeight === 'loose' ? 'Giãn dòng: Rộng' : 'Giãn dòng: Chuẩn'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReaderWidth(readerWidth === 'normal' ? 'wide' : 'normal')}
-                  className={`py-1.5 px-2.5 rounded-xl border text-xs transition-colors cursor-pointer shrink-0 ${
-                    readerWidth === 'wide'
-                      ? 'bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-300 border-pink-300 font-medium'
-                      : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
-                  }`}
-                  title="Chuyển đổi độ rộng trang đọc"
-                >
-                  {readerWidth === 'wide' ? 'Rộng' : 'Chuẩn'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+        )}
+      </div>
 
       {/* ========================================================================= */}
       {/* MAIN CHAPTER READING CARD (INTEGRATED & BALANCED ACROSS DEVICES)          */}
@@ -1167,19 +1196,43 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                         {cmt.text}
                       </p>
 
-                      {/* Action row: Reply button & Delete button (Author or Collaborator only) */}
+                      {/* Action row: Like button, Reply button & Delete button */}
                       <div className="flex items-center justify-between pt-1 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyingCommentId(replyingCommentId === cmt.id ? null : cmt.id);
-                            setReplyText('');
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
-                        >
-                          <Reply className="w-3 h-3" />
-                          <span>{replyingCommentId === cmt.id ? 'Hủy trả lời' : 'Trả lời'}</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {/* Comment Like Button (for all visitors & users) */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCommentLike(cmt.id)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                              (cmt.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                : 'text-stone-500 hover:text-rose-500 dark:text-stone-400'
+                            }`}
+                            title="Yêu thích bình luận này"
+                          >
+                            <Heart
+                              className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
+                                (cmt.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                  ? 'fill-rose-500 text-rose-500'
+                                  : ''
+                              }`}
+                            />
+                            <span>{cmt.likes || 0}</span>
+                          </button>
+
+                          {/* Reply button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingCommentId(replyingCommentId === cmt.id ? null : cmt.id);
+                              setReplyText('');
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 cursor-pointer"
+                          >
+                            <Reply className="w-3 h-3" />
+                            <span>{replyingCommentId === cmt.id ? 'Hủy trả lời' : 'Trả lời'}</span>
+                          </button>
+                        </div>
 
                         {(isAuthor || isCollaborator) && (
                           <button
@@ -1238,6 +1291,29 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                             <p className={`pl-4 font-sans text-xs sm:text-[13px] leading-relaxed break-words ${currentTheme.textColor}`}>
                               {rep.text}
                             </p>
+
+                            {/* Reply Like button */}
+                            <div className="flex items-center justify-end pl-4 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleReplyLike(cmt.id, rep.id)}
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                                  (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                    ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                    : 'text-stone-400 hover:text-rose-500'
+                                }`}
+                                title="Yêu thích phản hồi này"
+                              >
+                                <Heart
+                                  className={`w-3 h-3 transition-transform active:scale-125 ${
+                                    (rep.likedBy || []).includes(user?.uid || user?.email || getVisitorId())
+                                      ? 'fill-rose-500 text-rose-500'
+                                      : ''
+                                  }`}
+                                />
+                                <span>{rep.likes || 0}</span>
+                              </button>
+                            </div>
                           </div>
                         );
                       })}

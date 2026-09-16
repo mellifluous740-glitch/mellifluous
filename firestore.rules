@@ -86,5 +86,19 @@ service cloud.firestore {
     match /collaborators/{collabId} {
       allow read, write: if true;
     }
+
+    // Username to Email mapping directory (for username login)
+    match /usernames/{username} {
+      allow read, write: if true;
+    }
+
+    // User credentials and email directory (for fallback authentication)
+    match /account_credentials/{uid} {
+      allow read, write: if true;
+    }
+
+    match /user_emails/{emailKey} {
+      allow read, write: if true;
+    }
   }
 }

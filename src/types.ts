@@ -71,6 +71,8 @@ export interface CommentReply {
   isCollaborator?: boolean;
   roleBadge?: string;
   userEmail?: string | null;
+  likes?: number;
+  likedBy?: string[];
 }
 
 export interface RealtimeComment {
@@ -89,6 +91,8 @@ export interface RealtimeComment {
   createdAt: string;
   rating?: number | null;
   replies?: CommentReply[];
+  likes?: number;
+  likedBy?: string[];
 }
 
 export interface ReaderLetter {
@@ -140,6 +144,7 @@ export interface CollaboratorItem {
 export interface UserProfile {
   uid: string;
   email: string | null;
+  username?: string;
   displayName: string;
   photoURL?: string | null;
   bio?: string;

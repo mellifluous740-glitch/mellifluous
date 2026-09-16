@@ -16,10 +16,19 @@ import {
   addCollaborator,
   deleteCollaborator,
   updateCollaboratorRole,
+  updateCollaboratorFullData,
   getUserProfile,
   saveUserProfile,
   subscribeToUserProfile,
+  lookupEmailByUsername,
+  registerUsernameMapping,
+  checkUsernameAvailable,
+  findUserByEmail,
+  findUserByUsername,
+  saveUserAccount,
+  type StoredUserAccount,
 } from './realtimeService';
+import { hashPassword, generateSalt } from './authCrypto';
 
 // Danh sách email chính thức ban đầu của Tác giả & Các Cộng sự quản trị viên
 export const AUTHOR_EMAILS: string[] = [
@@ -27,6 +36,7 @@ export const AUTHOR_EMAILS: string[] = [
   'meomeoxinhxinh07@gmail.com',
   'nhatlinhpham010194@gmail.com',
   'maianhpham927@gmail.com',
+  'mellifluous740@gmail.com',
   'duongtieuvi102@gmail.com',
   'nguyenplinh1002@gmail.com',
   'nguyenlinhph0210@gmail.com',
@@ -34,6 +44,24 @@ export const AUTHOR_EMAILS: string[] = [
   'uongthienyenvi123@gmail.com',
   'vivi60810@gmail.com',
 ].map((email) => email.toLowerCase().trim());
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const refreshSessionActivity = () => {
+  try {
+    localStorage.setItem('mel_auth_last_activity', Date.now().toString());
+  } catch {}
+};
+
+export const isSessionExpired = (): boolean => {
+  try {
+    const lastActiveStr = localStorage.getItem('mel_auth_last_activity');
+    if (!lastActiveStr) return false;
+    const lastActive = parseInt(lastActiveStr, 10);
+    return Date.now() - lastActive > SEVEN_DAYS_MS;
+  } catch {}
+  return false;
+};
 
 export interface AppUser {
   uid: string;
@@ -67,10 +95,11 @@ interface AuthContextType {
   addCollaboratorByEmail: (email: string, displayName: string, role: CollaboratorItem['role'], note?: string) => Promise<void>;
   removeCollaborator: (collabId: string) => Promise<void>;
   updateCollaboratorRoleByAdmin: (collabId: string, role: CollaboratorItem['role'], roleTitle?: string) => Promise<void>;
+  updateCollaboratorFull: (collabId: string, data: Partial<Omit<CollaboratorItem, 'id'>>) => Promise<void>;
   updateUserProfileData: (data: Partial<UserProfile>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  signInWithEmail: (emailOrUsername: string, pass: string) => Promise<void>;
+  registerWithEmail: (email: string, pass: string, name: string, username?: string) => Promise<void>;
   quickAuthorLogin: (authorEmail: string) => void;
   quickReaderLogin: (nickname: string) => void;
   logout: () => Promise<void>;
@@ -81,8 +110,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(() => {
     try {
+      if (isSessionExpired()) {
+        localStorage.removeItem('mel_user_session');
+        localStorage.removeItem('mel_auth_last_activity');
+        return null;
+      }
       const saved = localStorage.getItem('mel_user_session');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        refreshSessionActivity();
+        return JSON.parse(saved);
+      }
     } catch {}
     return null;
   });
@@ -116,7 +153,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       (emailLower === 'cuncondangiu07@gmail.com' ||
         emailLower === 'meomeoxinhxinh07@gmail.com' ||
         emailLower === 'nhatlinhpham010194@gmail.com' ||
-        emailLower === 'maianhpham927@gmail.com');
+        emailLower === 'maianhpham927@gmail.com' ||
+        emailLower === 'mellifluous740@gmail.com' ||
+        emailLower === 'vivi60810@gmail.com');
     const isCollaborator = isAuthor && !isMainAuthor;
 
     let roleTitle = 'Độc giả yêu mến';
@@ -304,7 +343,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       editor: 'Biên tập viên / Editor',
     };
 
-    await addCollaborator({
+    const newCollab = await addCollaborator({
       email,
       displayName: displayName.trim() || email.split('@')[0],
       role,
@@ -312,10 +351,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addedBy: user?.displayName || user?.email || 'Tác giả chính',
       note: note || '',
     });
+
+    setCollaboratorsList((prev) => [
+      ...prev.filter((c) => c.email.toLowerCase() !== email.toLowerCase().trim()),
+      newCollab,
+    ]);
   };
 
   const removeCollaborator = async (collabId: string) => {
     await deleteCollaborator(collabId);
+    setCollaboratorsList((prev) =>
+      prev.filter((c) => c.id !== collabId && c.email.toLowerCase() !== collabId.toLowerCase())
+    );
   };
 
   const updateCollaboratorRoleByAdmin = async (
@@ -324,6 +371,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     roleTitle?: string
   ) => {
     await updateCollaboratorRole(collabId, role, roleTitle);
+    setCollaboratorsList((prev) =>
+      prev.map((c) =>
+        c.id === collabId || c.email.toLowerCase() === collabId.toLowerCase()
+          ? { ...c, role, roleTitle: roleTitle || c.roleTitle }
+          : c
+      )
+    );
+  };
+
+  const updateCollaboratorFull = async (
+    collabId: string,
+    data: Partial<Omit<CollaboratorItem, 'id'>>
+  ) => {
+    const updated = await updateCollaboratorFullData(collabId, data);
+    if (updated) {
+      setCollaboratorsList((prev) =>
+        prev.map((c) =>
+          c.id === collabId || c.email.toLowerCase() === collabId.toLowerCase() ? updated! : c
+        )
+      );
+    }
   };
 
   // Sign in with Google Popup
@@ -331,6 +399,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
+        refreshSessionActivity();
         const savedProfile = await getUserProfile(result.user.uid);
         const appUser = buildAppUser(result.user, collaboratorsList, savedProfile);
         setUser(appUser);
@@ -345,43 +414,246 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Sign in with Email / Password
-  const signInWithEmail = async (email: string, pass: string) => {
+  // Sign in with Email OR Username / Password (with seamless Firestore credentials fallback)
+  const signInWithEmail = async (emailOrUsername: string, pass: string) => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
-      if (result.user) {
-        const savedProfile = await getUserProfile(result.user.uid);
-        const appUser = buildAppUser(result.user, collaboratorsList, savedProfile);
+      const inputStr = emailOrUsername.trim();
+      if (!inputStr || !pass.trim()) {
+        throw new Error('Vui lòng nhập đầy đủ Email/Tên đăng nhập và Mật khẩu!');
+      }
+
+      let emailToUse = inputStr.toLowerCase();
+      let accountFromDb: StoredUserAccount | null = null;
+
+      // 1. If user typed a username (without @), lookup in directory
+      if (!inputStr.includes('@')) {
+        const cleanUsername = inputStr.toLowerCase();
+        accountFromDb = await findUserByUsername(cleanUsername);
+        if (accountFromDb && accountFromDb.email) {
+          emailToUse = accountFromDb.email.toLowerCase();
+        } else {
+          const foundEmail = await lookupEmailByUsername(cleanUsername);
+          if (foundEmail) {
+            emailToUse = foundEmail.toLowerCase();
+          } else {
+            throw new Error(`Tên đăng nhập "${inputStr}" không tồn tại. Vui lòng kiểm tra lại hoặc sử dụng địa chỉ email!`);
+          }
+        }
+      }
+
+      // If account object not loaded yet, query by email
+      if (!accountFromDb) {
+        accountFromDb = await findUserByEmail(emailToUse);
+      }
+
+      // 2. Try Firebase Auth (if active on Firebase project)
+      let firebaseUser: User | null = null;
+      try {
+        const result = await signInWithEmailAndPassword(auth, emailToUse, pass);
+        if (result.user) {
+          firebaseUser = result.user;
+        }
+      } catch (fbErr: any) {
+        if (
+          fbErr.code === 'auth/operation-not-allowed' ||
+          fbErr.message?.includes('operation-not-allowed') ||
+          fbErr.code === 'auth/user-not-found' ||
+          fbErr.code === 'auth/invalid-credential' ||
+          fbErr.code === 'auth/invalid-email'
+        ) {
+          console.info('Firebase auth sign-in bypassed (checking Firestore account):', fbErr.code || fbErr.message);
+        } else {
+          console.warn('Firebase sign-in warning:', fbErr);
+        }
+      }
+
+      if (firebaseUser) {
+        refreshSessionActivity();
+        const savedProfile = (await getUserProfile(firebaseUser.uid)) || accountFromDb;
+        const appUser = buildAppUser(firebaseUser, collaboratorsList, savedProfile);
         setUser(appUser);
         try {
           localStorage.setItem('mel_user_session', JSON.stringify(appUser));
         } catch {}
+        closeAuthModal();
+        return;
       }
-      closeAuthModal();
+
+      // 3. Fallback: Verify with Firestore Account
+      if (accountFromDb) {
+        if (accountFromDb.passwordHash && accountFromDb.salt) {
+          const computedHash = await hashPassword(pass, accountFromDb.salt);
+          if (computedHash === accountFromDb.passwordHash) {
+            refreshSessionActivity();
+            const appUser = buildAppUser(
+              {
+                uid: accountFromDb.uid,
+                email: accountFromDb.email,
+                displayName: accountFromDb.displayName,
+                photoURL: accountFromDb.photoURL || null,
+              },
+              collaboratorsList,
+              accountFromDb
+            );
+            setUser(appUser);
+            try {
+              localStorage.setItem('mel_user_session', JSON.stringify(appUser));
+            } catch {}
+            closeAuthModal();
+            return;
+          } else {
+            throw new Error('Mật khẩu không chính xác. Vui lòng kiểm tra lại!');
+          }
+        } else {
+          throw new Error('Tài khoản này được đăng ký thông qua Google. Vui lòng chọn Đăng nhập bằng Google!');
+        }
+      }
+
+      // 4. Special case for predefined Author / Admin emails
+      const cleanEmailLower = emailToUse.toLowerCase().trim();
+      if (AUTHOR_EMAILS.includes(cleanEmailLower)) {
+        quickAuthorLogin(cleanEmailLower);
+        closeAuthModal();
+        return;
+      }
+
+      throw new Error(`Không tìm thấy tài khoản "${inputStr}". Vui lòng kiểm tra lại hoặc chuyển sang tab Đăng ký!`);
     } catch (err: any) {
       console.error('Email sign in error:', err);
       throw err;
     }
   };
 
-  // Register with Email / Password
-  const registerWithEmail = async (email: string, pass: string, name: string) => {
+  // Register with Email / Username / Password (with seamless Firestore account support)
+  const registerWithEmail = async (
+    email: string,
+    pass: string,
+    name: string,
+    username?: string
+  ) => {
     try {
-      const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-      if (result.user) {
-        if (name.trim()) {
-          await updateProfile(result.user, { displayName: name.trim() }).catch(() => {});
-        }
-        const updatedUser = {
-          ...result.user,
-          displayName: name.trim() || result.user.displayName,
-        };
-        const appUser = buildAppUser(updatedUser, collaboratorsList);
-        setUser(appUser);
-        try {
-          localStorage.setItem('mel_user_session', JSON.stringify(appUser));
-        } catch {}
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+        throw new Error('Địa chỉ email không đúng định dạng. Vui lòng kiểm tra lại!');
       }
+
+      if (!pass || pass.length < 6) {
+        throw new Error('Mật khẩu cần tối thiểu 6 ký tự để đảm bảo an toàn!');
+      }
+
+      // Normalize username or fallback to email prefix
+      let cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
+      if (!cleanUsername) {
+        cleanUsername = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '');
+      }
+
+      // Check username availability
+      const isAvail = await checkUsernameAvailable(cleanUsername);
+      if (!isAvail) {
+        throw new Error(`Tên đăng nhập "${cleanUsername}" đã có người đăng ký. Vui lòng chọn một tên đăng nhập khác!`);
+      }
+
+      // Check if email already registered in Firestore
+      const existingAccount = await findUserByEmail(cleanEmail);
+      if (existingAccount) {
+        throw new Error(`Email "${cleanEmail}" đã được đăng ký tài khoản. Vui lòng chuyển sang tab Đăng nhập!`);
+      }
+
+      let firebaseUser: User | null = null;
+
+      // 1. Try Firebase Auth first
+      try {
+        const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+        if (result.user) {
+          firebaseUser = result.user;
+        }
+      } catch (fbErr: any) {
+        if (
+          fbErr.code === 'auth/operation-not-allowed' ||
+          fbErr.message?.includes('operation-not-allowed')
+        ) {
+          console.info('Firebase Email/Password provider disabled on console. Registering seamlessly via Firestore Account.');
+        } else if (fbErr.code === 'auth/email-already-in-use') {
+          throw new Error('Email này đã được đăng ký tài khoản. Vui lòng chuyển sang tab Đăng nhập!');
+        } else if (fbErr.code === 'auth/weak-password') {
+          throw new Error('Mật khẩu cần tối thiểu 6 ký tự.');
+        } else if (fbErr.code === 'auth/invalid-email') {
+          throw new Error('Định dạng email không hợp lệ.');
+        } else {
+          console.warn('Firebase createUser warning, using Firestore account:', fbErr);
+        }
+      }
+
+      // 2. Determine UID and secure password hash
+      const uid = firebaseUser
+        ? firebaseUser.uid
+        : `usr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const displayName = name.trim() || cleanUsername || cleanEmail.split('@')[0];
+
+      if (firebaseUser) {
+        await updateProfile(firebaseUser, { displayName }).catch(() => {});
+      }
+
+      const salt = generateSalt();
+      const passwordHash = await hashPassword(pass, salt);
+
+      const isDefaultAuthor = AUTHOR_EMAILS.includes(cleanEmail);
+      const isMain =
+        isDefaultAuthor &&
+        (cleanEmail === 'cuncondangiu07@gmail.com' ||
+          cleanEmail === 'meomeoxinhxinh07@gmail.com' ||
+          cleanEmail === 'nhatlinhpham010194@gmail.com' ||
+          cleanEmail === 'maianhpham927@gmail.com' ||
+          cleanEmail === 'mellifluous740@gmail.com' ||
+          cleanEmail === 'vivi60810@gmail.com');
+
+      const role: 'author' | 'admin' | 'collaborator' | 'editor' | 'reader' = isMain
+        ? 'author'
+        : isDefaultAuthor
+        ? 'collaborator'
+        : 'reader';
+      const roleTitle = isMain
+        ? 'Tác giả • Mellifluous'
+        : isDefaultAuthor
+        ? 'Cộng sự • Ban quản trị'
+        : 'Độc giả yêu mến';
+
+      const newAccount: StoredUserAccount = {
+        uid,
+        email: cleanEmail,
+        username: cleanUsername,
+        displayName,
+        photoURL: firebaseUser?.photoURL || null,
+        role,
+        roleTitle,
+        passwordHash,
+        salt,
+        authProvider: firebaseUser ? 'firebase_email' : 'firestore_email',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 3. Save to Firestore (both user account and username mapping)
+      await saveUserAccount(newAccount);
+
+      // 4. Update session
+      refreshSessionActivity();
+      const appUser = buildAppUser(
+        {
+          uid,
+          email: cleanEmail,
+          displayName,
+          photoURL: firebaseUser?.photoURL || null,
+        },
+        collaboratorsList,
+        newAccount
+      );
+
+      setUser(appUser);
+      try {
+        localStorage.setItem('mel_user_session', JSON.stringify(appUser));
+      } catch {}
+
       closeAuthModal();
     } catch (err: any) {
       console.error('Register error:', err);
@@ -391,6 +663,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Quick switch / Direct sign-in for Author & Collaborators
   const quickAuthorLogin = (authorEmail: string) => {
+    refreshSessionActivity();
     const cleanEmail = authorEmail.toLowerCase().trim();
     const isMain =
       cleanEmail === 'cuncondangiu07@gmail.com' ||
@@ -398,7 +671,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       cleanEmail === 'meomeoxinhxinh07@gmail.com' ||
       cleanEmail.split('@')[0] === 'meomeoxinhxinh07' ||
       cleanEmail.split('@')[0] === 'nhatlinhpham010194' ||
-      cleanEmail.split('@')[0] === 'maianhpham927';
+      cleanEmail.split('@')[0] === 'maianhpham927' ||
+      cleanEmail.split('@')[0] === 'mellifluous740' ||
+      cleanEmail.split('@')[0] === 'vivi60810';
     const appUser: AppUser = {
       uid: `author_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
       email: cleanEmail,
@@ -420,6 +695,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Quick sign-in for Readers / Guests
   const quickReaderLogin = (nickname: string) => {
+    refreshSessionActivity();
     const trimmed = nickname.trim() || 'Bạn đọc thân thương';
     const appUser: AppUser = {
       uid: `reader_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -447,6 +723,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(null);
       try {
         localStorage.removeItem('mel_user_session');
+        localStorage.removeItem('mel_auth_last_activity');
       } catch {}
     }
   };
@@ -469,6 +746,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addCollaboratorByEmail,
         removeCollaborator,
         updateCollaboratorRoleByAdmin,
+        updateCollaboratorFull,
         updateUserProfileData,
         signInWithGoogle,
         signInWithEmail,
