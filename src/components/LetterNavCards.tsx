@@ -20,8 +20,6 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
     {
       id: 'completed' as LetterTab,
       title: 'Truyện đã hoàn thành',
-      subtitle: 'Trọn vẹn tình đầu • Kết thúc viên mãn (HE)',
-      desc: 'Những câu chuyện đã kết thúc trọn vẹn, yên tâm lọt hố không lo đợi chương mới.',
       count: `${completedCount} bộ truyện`,
       // Color: Soft Cherry Blossom Pink
       bgLight: 'bg-gradient-to-br from-pink-50/95 via-rose-50/85 to-pink-100/70',
