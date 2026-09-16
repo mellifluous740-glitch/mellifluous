@@ -340,6 +340,8 @@ export const AuthModal: React.FC = () => {
                     </svg>
                     <span>{isLoading ? 'Đang kết nối Google...' : 'Đăng nhập nhanh bằng tài khoản Gmail'}</span>
                   </button>
+                </div>
+              )}
 
               {/* Tab 2: Biệt hiệu Độc giả (Instant nickname login - no password or OAuth needed) */}
               {activeTab === 'guest' && (
