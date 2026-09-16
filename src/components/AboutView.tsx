@@ -25,7 +25,11 @@ export const AboutView: React.FC = () => {
               ━ Một chiếc thuyền nhỏ lênh đênh ngược gió
             </p>
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-              Mellifluous có nghĩa là "ngọt ngào như mật, êm dịu rót vào tai". Đây là nơi mình góp nhặt những câu chuyện tình thanh xuân vườn trường, ngọt ngào và chữa lành nhất để sẻ chia cùng những bạn đọc có cùng tình yêu với mùa hè và hoa anh đào.
+              ━Mell là một genZ chính hiệu, đuôi 07, còn là học sinh ngồi trên ghế nhà trường
+              ━Một cô bé cung Bảo Bình, thích mộng mơ và làm bạn với con chữ
+              ━Blog lập ra với mục đích thỏa mãn đam mê đọc truyện, đồng thời là nơi tớ luyện ngoại ngữ để sau này còn có cái để phục vụ học tập và làm việc
+              ━Mell vừa edit, vừa dịch, làm phi lợi nhuận, đa số là chưa được sự đồng ý của tác giả 
+              ━Truyện trong nhà đều dựa theo gu truyện cá nhân của tớ, mong mọi người sẽ tôn trọng điều đó ạ
             </p>
           </div>
         </div>
@@ -38,10 +42,10 @@ export const AboutView: React.FC = () => {
             <Heart className="w-5 h-5" />
           </div>
           <h3 className="font-serif text-base font-bold text-stone-800 dark:text-stone-100">
-            Thuần Ngọt & Thanh Xuân
+            ĐẢM BẢO ĐỌC TẠI WEB CHÍNH CHỦ
           </h3>
           <p className="text-xs text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-            Chỉ dịch những bộ truyện có kết thúc viên mãn (Happy Ending), nhẹ nhàng, không cẩu huyết hay ngược tâm sâu sắc.
+            Truyện Mell edit và dịch đăng tại TRANG WEB NÀY, WORPRESS, WATTPAD chính chủ, truyện được đăng tải tại mọi nơi khác đều không thuộc quyền quản lý của tớ và sẽ không do tớ chịu trách nhiệm
           </p>
         </div>
 
@@ -50,10 +54,10 @@ export const AboutView: React.FC = () => {
             <Shield className="w-5 h-5" />
           </div>
           <h3 className="font-serif text-base font-bold text-stone-800 dark:text-stone-100">
-            Phi Thương Mại 100%
+            KHÔNG REUP & CHUYỂN VER
           </h3>
           <p className="text-xs text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-            Tất cả truyện được chuyển ngữ phi lợi nhuận. Mật khẩu được cài đặt chỉ nhằm bảo vệ chất xám và tránh tình trạng reup tràn lan.
+            Tất cả truyện được chuyển ngữ phi lợi nhuận. Mật khẩu được cài đặt chỉ nhằm bảo vệ chất xám của tác giả cũng như người dịch, tránh tình trạng reup tràn lan.
           </p>
         </div>
 
@@ -62,10 +66,10 @@ export const AboutView: React.FC = () => {
             <Coffee className="w-5 h-5" />
           </div>
           <h3 className="font-serif text-base font-bold text-stone-800 dark:text-stone-100">
-            Cảm Ơn Bạn Đọc
+            LỜI CẢM ƠN CẢU MELL
           </h3>
           <p className="text-xs text-stone-600 dark:text-stone-300 font-sans leading-relaxed">
-            Mỗi bình luận, mỗi lượt ghé thăm và lượt thả tim của các bạn chính là nguồn động lực lớn nhất để Mel tiếp tục chèo lái chiếc thuyền nhỏ này.
+            Cảm ơn các tình iu đã ghé qua và ở lại với Mell, mỗi bình luận, lượt đánh giá và lượt thả tim của các tình iu chính là nguồn động lực lớn nhất để Mell tiếp tục chèo lái chiếc thuyền nhỏ này.
           </p>
         </div>
       </div>
