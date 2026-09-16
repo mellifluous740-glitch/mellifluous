@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { getStoryChapters } from '../../data/mockData';
-import { publishChapter, deleteChapter } from '../../lib/realtimeService';
+import { publishChapter, deleteChapter, subscribeToStoryChapters } from '../../lib/realtimeService';
 
 interface AuthorEditChapterTabProps {
   stories: Story[];
@@ -47,16 +47,27 @@ export const AuthorEditChapterTab: React.FC<AuthorEditChapterTabProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Load chapters when selected story changes
+  // Load chapters when selected story changes with realtime subscription
   useEffect(() => {
     if (!selectedStoryId) return;
     const list = getStoryChapters(selectedStoryId);
     setChapters(list);
     if (list.length > 0) {
-      setSelectedChapterId(list[0].id);
+      setSelectedChapterId((prev) => (list.some((c) => c.id === prev) ? prev : list[0].id));
     } else {
       setSelectedChapterId('');
     }
+
+    const unsub = subscribeToStoryChapters(selectedStoryId, (liveList) => {
+      setChapters(liveList);
+      if (liveList.length > 0) {
+        setSelectedChapterId((prev) => (liveList.some((c) => c.id === prev) ? prev : liveList[0].id));
+      } else {
+        setSelectedChapterId('');
+      }
+    });
+
+    return () => unsub();
   }, [selectedStoryId]);
 
   // Load chapter form data when selected chapter changes

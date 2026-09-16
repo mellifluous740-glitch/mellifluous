@@ -802,8 +802,30 @@ export const deleteCustomChapterFromStorage = (storyId: string, chapterId: strin
   } catch {}
 };
 
+// Live synchronized chapters cache from Firestore across all devices and clients
+const liveChaptersRuntimeCache: Record<string, Chapter[]> = {};
+
+export const setLiveChaptersRuntimeCache = (cache: Record<string, Chapter[]>): void => {
+  for (const [storyId, list] of Object.entries(cache)) {
+    liveChaptersRuntimeCache[storyId] = list;
+  }
+};
+
+export const setLiveStoryChapters = (storyId: string, chapters: Chapter[]): void => {
+  liveChaptersRuntimeCache[storyId] = chapters;
+};
+
+export const getLiveChaptersRuntimeCache = (): Record<string, Chapter[]> => {
+  return { ...liveChaptersRuntimeCache };
+};
+
 export const getStoryChapters = (storyId: string): Chapter[] => {
-  // 1. Retrieve custom author-published chapters first
+  // 1. Prioritize live real-time chapters from Firestore synchronized runtime cache
+  if (liveChaptersRuntimeCache[storyId] && liveChaptersRuntimeCache[storyId].length > 0) {
+    return liveChaptersRuntimeCache[storyId];
+  }
+
+  // 2. Retrieve custom author-published chapters first
   const customChapters = getStoredCustomChapters(storyId);
 
   // 2. Retrieve base sample chapters

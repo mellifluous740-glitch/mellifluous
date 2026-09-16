@@ -27,6 +27,9 @@ import {
   deleteCustomChapterFromStorage,
   getStoredCustomChapters,
   getStoryChapters,
+  setLiveChaptersRuntimeCache,
+  setLiveStoryChapters,
+  getLiveChaptersRuntimeCache,
 } from '../data/mockData';
 
 /**
@@ -59,6 +62,7 @@ export const sanitizeForFirestore = <T>(data: T): T => {
 const activeStorySubscribers = new Set<(stories: Story[]) => void>();
 const activeAnnouncementSubscribers = new Set<(announcements: Announcement[]) => void>();
 const activeChapterSubscribers = new Map<string, Set<(chapters: Chapter[]) => void>>();
+const activeAllChaptersSubscribers = new Set<(chaptersMap: Record<string, Chapter[]>) => void>();
 const globalStatsListeners = new Set<(stats: GlobalRealtimeStats) => void>();
 
 let cachedGlobalStats: GlobalRealtimeStats = {
@@ -111,6 +115,16 @@ const notifyChapterSubscribers = (storyId: string, chapters: Chapter[]) => {
       }
     });
   }
+};
+
+const notifyAllChaptersSubscribers = (chaptersMap: Record<string, Chapter[]>) => {
+  activeAllChaptersSubscribers.forEach((cb) => {
+    try {
+      cb(chaptersMap);
+    } catch (e) {
+      console.warn('All chapters subscriber callback error:', e);
+    }
+  });
 };
 
 // Constants
@@ -1282,6 +1296,7 @@ export const getStoredAnnouncements = (): Announcement[] => {
 
 /**
  * Subscribe to published stories from Firestore with immediate local fallback.
+ * Automatically synchronizes and preserves default stories and cloud stories.
  */
 export const subscribeToPublishedStories = (
   callback: (stories: Story[]) => void
@@ -1299,18 +1314,79 @@ export const subscribeToPublishedStories = (
     const storiesColl = collection(db, 'stories');
     unsubFirestore = onSnapshot(
       storiesColl,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const list: Story[] = [];
+      async (snapshot) => {
+        if (snapshot.empty) {
+          // Auto-seed base stories into Firestore so they exist on the server
+          console.info('Firestore stories collection is empty. Seeding initial stories...');
+          for (const s of STORIES) {
+            try {
+              const clean = sanitizeForFirestore(s);
+              await setDoc(doc(db, 'stories', s.id), clean, { merge: true });
+              await setDoc(
+                doc(db, 'story_stats', s.id),
+                {
+                  storyId: s.id,
+                  views: s.views || 0,
+                  likes: s.likes || 0,
+                  followers: 0,
+                  ratingSum: 0,
+                  ratingCount: 0,
+                  commentCount: 0,
+                  updatedAt: new Date().toISOString(),
+                },
+                { merge: true }
+              );
+            } catch (seedErr) {
+              console.warn('Failed to seed story to Firestore:', s.id, seedErr);
+            }
+          }
+          // Also seed base sample chapters into Firestore
+          for (const [sId, chList] of Object.entries(SAMPLE_CHAPTERS)) {
+            for (const ch of chList) {
+              try {
+                await setDoc(doc(db, 'chapters', ch.id), sanitizeForFirestore(ch), { merge: true });
+              } catch (chErr) {
+                console.warn('Failed to seed chapter to Firestore:', ch.id, chErr);
+              }
+            }
+          }
+        } else {
+          // Firestore has stories!
+          const firestoreMap = new Map<string, Story>();
           snapshot.forEach((d) => {
             const item = d.data() as Story;
-            list.push({ ...item, id: d.id });
+            firestoreMap.set(d.id, { ...item, id: d.id });
           });
+
+          // Check deleted story IDs from localStorage
+          let deletedIds = new Set<string>();
+          try {
+            const rawDel = localStorage.getItem('mel_deleted_story_ids');
+            if (rawDel) deletedIds = new Set(JSON.parse(rawDel));
+          } catch {}
+
+          // Combine STORIES baseline + Firestore documents
+          const combined = new Map<string, Story>();
+          STORIES.forEach((s) => {
+            if (!deletedIds.has(s.id)) {
+              combined.set(s.id, s);
+            }
+          });
+          firestoreMap.forEach((s, id) => {
+            if (!deletedIds.has(id)) {
+              combined.set(id, s);
+            }
+          });
+
+          const list = Array.from(combined.values());
           list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+
           try {
             localStorage.setItem('mel_published_stories', JSON.stringify(list));
           } catch {}
+
           callback(list);
+          notifyStorySubscribers(list);
         }
       },
       (err) => {
@@ -1332,7 +1408,17 @@ export const subscribeToPublishedStories = (
  * Guarantees zero failures and prevents undefined field crashes.
  */
 export const publishStory = async (story: Story): Promise<void> => {
-  // 1. Sanitize all fields to eliminate any undefined values
+  // 1. If previously deleted, unmark deleted
+  try {
+    const rawDel = localStorage.getItem('mel_deleted_story_ids');
+    if (rawDel) {
+      const delList: string[] = JSON.parse(rawDel);
+      const filtered = delList.filter((id) => id !== story.id);
+      localStorage.setItem('mel_deleted_story_ids', JSON.stringify(filtered));
+    }
+  } catch {}
+
+  // 2. Sanitize all fields to eliminate any undefined values
   const cleanStory: Story = {
     id: story.id,
     title: story.title.trim(),
@@ -1352,12 +1438,12 @@ export const publishStory = async (story: Story): Promise<void> => {
     passwordHint: (story.passwordHint || '').trim(),
     passwordKey: (story.passwordKey || '').trim().toLowerCase(),
     updatedAt: 'Vừa đăng',
-    views: story.views ?? 0,
-    likes: story.likes ?? 0,
+    views: Number(story.views) || 0,
+    likes: Number(story.likes) || 0,
     featured: Boolean(story.featured),
   };
 
-  // 2. Synchronously persist into localStorage
+  // 3. Synchronously persist into localStorage
   try {
     const currentList = getStoredStories();
     const idx = currentList.findIndex((s) => s.id === cleanStory.id);
@@ -1374,22 +1460,23 @@ export const publishStory = async (story: Story): Promise<void> => {
     console.warn('Local storage save warning:', localErr);
   }
 
-  // 3. Attempt Firestore cloud sync (safe, non-blocking)
+  // 4. Attempt Firestore cloud sync (safe, non-blocking)
   try {
-    const storyRef = doc(db, 'stories', cleanStory.id);
-    await setDoc(storyRef, {
+    const sanitizedDoc = sanitizeForFirestore({
       ...cleanStory,
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
     });
+    const storyRef = doc(db, 'stories', cleanStory.id);
+    await setDoc(storyRef, sanitizedDoc, { merge: true });
 
     const statsRef = doc(db, 'story_stats', cleanStory.id);
     await setDoc(
       statsRef,
       {
         storyId: cleanStory.id,
-        views: 0,
-        likes: 0,
+        views: cleanStory.views || 0,
+        likes: cleanStory.likes || 0,
         followers: 0,
         ratingSum: 0,
         ratingCount: 0,
@@ -1407,7 +1494,17 @@ export const publishStory = async (story: Story): Promise<void> => {
  * Delete a story with dual-engine persistence (Local + Firestore).
  */
 export const deleteStory = async (storyId: string): Promise<void> => {
-  // 1. Remove from localStorage
+  // 1. Mark as deleted in localStorage
+  try {
+    const rawDel = localStorage.getItem('mel_deleted_story_ids');
+    const delList: string[] = rawDel ? JSON.parse(rawDel) : [];
+    if (!delList.includes(storyId)) {
+      delList.push(storyId);
+      localStorage.setItem('mel_deleted_story_ids', JSON.stringify(delList));
+    }
+  } catch {}
+
+  // 2. Remove from localStorage
   try {
     const currentList = getStoredStories();
     const updatedList = currentList.filter((s) => s.id !== storyId);
@@ -1418,13 +1515,73 @@ export const deleteStory = async (storyId: string): Promise<void> => {
     console.warn('Local delete warning:', localErr);
   }
 
-  // 2. Remove from Firestore
+  // 3. Remove from Firestore: story doc, stats doc, and chapters
   try {
     await deleteDoc(doc(db, 'stories', storyId));
     await deleteDoc(doc(db, 'story_stats', storyId));
+
+    const chaptersColl = collection(db, 'chapters');
+    const q = query(chaptersColl, where('storyId', '==', storyId));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
   } catch (firestoreErr) {
     console.warn('Firestore delete warning:', firestoreErr);
   }
+};
+
+/**
+ * Subscribe to all chapters across the entire site in real time from Firestore.
+ * Automatically organizes chapters by storyId and notifies subscribers.
+ */
+export const subscribeToAllChapters = (
+  callback: (chaptersMap: Record<string, Chapter[]>) => void
+): (() => void) => {
+  // 1. Provide current memory cache
+  callback(getLiveChaptersRuntimeCache());
+  activeAllChaptersSubscribers.add(callback);
+
+  // 2. Listen to Firestore collection 'chapters'
+  let unsubFirestore: (() => void) | null = null;
+  try {
+    const chaptersColl = collection(db, 'chapters');
+    unsubFirestore = onSnapshot(
+      chaptersColl,
+      (snapshot) => {
+        const grouped: Record<string, Chapter[]> = {};
+        snapshot.forEach((d) => {
+          const ch = { ...(d.data() as Chapter), id: d.id };
+          if (!grouped[ch.storyId]) grouped[ch.storyId] = [];
+          grouped[ch.storyId].push(ch);
+        });
+
+        // For each story, sort and update
+        for (const [sId, chList] of Object.entries(grouped)) {
+          chList.sort((a, b) => a.chapterNumber - b.chapterNumber);
+          try {
+            localStorage.setItem(`mel_chapters_${sId}`, JSON.stringify(chList));
+          } catch {}
+          setLiveStoryChapters(sId, chList);
+          notifyChapterSubscribers(sId, chList);
+        }
+
+        const fullCache = getLiveChaptersRuntimeCache();
+        callback(fullCache);
+        notifyAllChaptersSubscribers(fullCache);
+      },
+      (err) => {
+        console.warn('All chapters Firestore snapshot error:', err);
+      }
+    );
+  } catch (e) {
+    console.warn('Firestore all chapters subscription error:', e);
+  }
+
+  return () => {
+    activeAllChaptersSubscribers.delete(callback);
+    if (unsubFirestore) unsubFirestore();
+  };
 };
 
 /**
@@ -1444,11 +1601,11 @@ export const subscribeToStoryChapters = (
   }
   activeChapterSubscribers.get(storyId)!.add(callback);
 
-  // 3. Connect to Firestore
+  // 3. Connect to Firestore without composite index requirements
   let unsubFirestore: (() => void) | null = null;
   try {
     const chaptersColl = collection(db, 'chapters');
-    const q = query(chaptersColl, where('storyId', '==', storyId), orderBy('chapterNumber', 'asc'));
+    const q = query(chaptersColl, where('storyId', '==', storyId));
 
     unsubFirestore = onSnapshot(
       q,
@@ -1458,6 +1615,11 @@ export const subscribeToStoryChapters = (
           snapshot.forEach((d) => {
             list.push({ ...(d.data() as Chapter), id: d.id });
           });
+          list.sort((a, b) => a.chapterNumber - b.chapterNumber);
+          try {
+            localStorage.setItem(`mel_chapters_${storyId}`, JSON.stringify(list));
+          } catch {}
+          setLiveStoryChapters(storyId, list);
           callback(list);
         }
       },
@@ -1488,9 +1650,11 @@ export const publishChapter = async (chapter: Chapter): Promise<void> => {
     title: chapter.title.trim(),
     publishedAt: chapter.publishedAt || new Date().toISOString(),
     isLocked: Boolean(chapter.isLocked),
+    passwordHint: (chapter.passwordHint || '').trim(),
+    passwordKey: (chapter.passwordKey || '').trim().toLowerCase(),
     content: chapter.content.trim(),
     translatorNote: (chapter.translatorNote || '').trim(),
-    wordCount: Number(chapter.wordCount) || (chapter.content ? chapter.content.trim().split(/\s+/).length : 0),
+    wordCount: Number(chapter.wordCount) || (chapter.content ? chapter.content.trim().split(/\s+/).filter(Boolean).length : 0),
     isExtra: Boolean(chapter.isExtra),
     extraNumber: chapter.extraNumber || (chapter.isExtra ? Number(chapter.chapterNumber) : 0),
     partType: chapter.partType || (chapter.isExtra ? 'extra' : 'main'),
@@ -1513,25 +1677,35 @@ export const publishChapter = async (chapter: Chapter): Promise<void> => {
     console.warn('Update story chapters count warning:', err);
   }
 
-  // 4. Notify chapter listeners
+  // 4. Update memory cache and notify chapter listeners immediately
   const allChapters = getStoryChapters(cleanChapter.storyId);
+  setLiveStoryChapters(cleanChapter.storyId, allChapters);
   notifyChapterSubscribers(cleanChapter.storyId, allChapters);
 
   // 5. Cloud sync to Firestore
   try {
     const chapterRef = doc(db, 'chapters', cleanChapter.id);
-    await setDoc(chapterRef, {
-      ...cleanChapter,
-      publishedAt: new Date().toISOString(),
-    });
+    await setDoc(
+      chapterRef,
+      sanitizeForFirestore({
+        ...cleanChapter,
+        publishedAt: cleanChapter.publishedAt || new Date().toISOString(),
+      }),
+      { merge: true }
+    );
 
     const storyRef = doc(db, 'stories', cleanChapter.storyId);
-    await updateDoc(storyRef, {
-      completedChapters: cleanChapter.chapterNumber,
-      updatedAt: 'Vừa đăng',
-    }).catch(() => {});
+    await setDoc(
+      storyRef,
+      {
+        completedChapters: cleanChapter.chapterNumber,
+        updatedAt: 'Vừa đăng',
+      },
+      { merge: true }
+    );
   } catch (firestoreErr) {
-    console.warn('Firestore publish chapter warning (saved locally):', firestoreErr);
+    console.error('Firestore publish chapter error:', firestoreErr);
+    throw firestoreErr;
   }
 };
 
@@ -1540,7 +1714,9 @@ export const publishChapter = async (chapter: Chapter): Promise<void> => {
  */
 export const deleteChapter = async (storyId: string, chapterId: string): Promise<void> => {
   deleteCustomChapterFromStorage(storyId, chapterId);
-  notifyChapterSubscribers(storyId, getStoryChapters(storyId));
+  const remaining = getStoryChapters(storyId).filter((c) => c.id !== chapterId);
+  setLiveStoryChapters(storyId, remaining);
+  notifyChapterSubscribers(storyId, remaining);
 
   try {
     await deleteDoc(doc(db, 'chapters', chapterId));

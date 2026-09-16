@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ActiveTab, Story, Announcement } from './types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ActiveTab, Story, Announcement, RecentUpdate } from './types';
 import { STORIES, ANNOUNCEMENTS, RECENT_UPDATES, getStoryChapters } from './data/mockData';
-import { subscribeToPublishedStories, subscribeToAnnouncements } from './lib/realtimeService';
+import { subscribeToPublishedStories, subscribeToAnnouncements, subscribeToAllChapters } from './lib/realtimeService';
 import { AuthorPublishModal } from './components/AuthorPublishModal';
 import { Navbar } from './components/Navbar';
 import { HeroIntro } from './components/HeroIntro';
@@ -64,8 +64,9 @@ export default function App() {
   const [isAuthorModalOpen, setIsAuthorModalOpen] = useState<boolean>(false);
   const [stories, setStories] = useState<Story[]>(STORIES);
   const [announcements, setAnnouncements] = useState<Announcement[]>(ANNOUNCEMENTS);
+  const [chaptersVersion, setChaptersVersion] = useState<number>(0);
 
-  // Real-time synchronization of published stories & announcements
+  // Real-time synchronization of published stories, chapters & announcements across all devices
   useEffect(() => {
     const unsubStories = subscribeToPublishedStories((liveStories) => {
       if (liveStories && liveStories.length > 0) {
@@ -73,6 +74,10 @@ export default function App() {
       } else {
         setStories(STORIES);
       }
+    });
+
+    const unsubChapters = subscribeToAllChapters(() => {
+      setChaptersVersion((v) => v + 1);
     });
 
     const unsubAnn = subscribeToAnnouncements((liveAnn) => {
@@ -85,6 +90,7 @@ export default function App() {
 
     return () => {
       unsubStories();
+      unsubChapters();
       unsubAnn();
     };
   }, []);
@@ -234,10 +240,36 @@ export default function App() {
 
   const modalStory = modalStoryId ? stories.find((s) => s.id === modalStoryId) || null : null;
 
+  const dynamicRecentUpdates: RecentUpdate[] = useMemo(() => {
+    const list: RecentUpdate[] = [];
+    stories.forEach((story) => {
+      const chs = getStoryChapters(story.id);
+      if (chs.length > 0) {
+        const latest = chs[chs.length - 1];
+        list.push({
+          id: `upd-${story.id}-${latest.id}`,
+          storyId: story.id,
+          storyTitle: story.title,
+          chapterNumber: latest.chapterNumber,
+          chapterTitle: latest.title,
+          timeAgo: story.updatedAt || 'Vừa đăng',
+          isLocked: Boolean(latest.isLocked),
+          status: story.status,
+        });
+      }
+    });
+    if (list.length > 0) {
+      return list.slice(0, 10);
+    }
+    return RECENT_UPDATES;
+  }, [stories, chaptersVersion]);
+
   const readingStory = readingChapterInfo
     ? stories.find((s) => s.id === readingChapterInfo.storyId) || null
     : null;
-  const readingChapters = readingStory ? getStoryChapters(readingStory.id) : [];
+  const readingChapters = useMemo(() => {
+    return readingStory ? getStoryChapters(readingStory.id) : [];
+  }, [readingStory, chaptersVersion]);
   const readingChapter =
     readingStory && readingChapterInfo
       ? readingChapters.find((c) => c.chapterNumber === readingChapterInfo.chapterNumber) ||
@@ -297,7 +329,7 @@ export default function App() {
               <CompletedStoriesView
                 stories={stories}
                 announcements={announcements}
-                recentUpdates={RECENT_UPDATES}
+                recentUpdates={dynamicRecentUpdates}
                 onBackToHome={() => handleNavSelect('home')}
                 onOpenStory={handleOpenStoryModal}
                 onSelectChapter={handleOpenChapter}
@@ -309,7 +341,7 @@ export default function App() {
               <OngoingStoriesView
                 stories={stories}
                 announcements={announcements}
-                recentUpdates={RECENT_UPDATES}
+                recentUpdates={dynamicRecentUpdates}
                 onBackToHome={() => handleNavSelect('home')}
                 onOpenStory={handleOpenStoryModal}
                 onSelectChapter={handleOpenChapter}
@@ -343,7 +375,7 @@ export default function App() {
                     <Sidebar
                       stories={stories}
                       announcements={announcements}
-                      recentUpdates={RECENT_UPDATES}
+                      recentUpdates={dynamicRecentUpdates}
                       onSelectStory={handleOpenStoryModal}
                       onSelectChapter={handleOpenChapter}
                       onFilterGenre={(g) => setSelectedGenreFilter(g)}
@@ -380,7 +412,7 @@ export default function App() {
                     <Sidebar
                       stories={stories}
                       announcements={announcements}
-                      recentUpdates={RECENT_UPDATES}
+                      recentUpdates={dynamicRecentUpdates}
                       onSelectStory={handleOpenStoryModal}
                       onSelectChapter={handleOpenChapter}
                       onFilterGenre={(g) => setSelectedGenreFilter(g)}
@@ -417,7 +449,7 @@ export default function App() {
                     <Sidebar
                       stories={stories}
                       announcements={announcements}
-                      recentUpdates={RECENT_UPDATES}
+                      recentUpdates={dynamicRecentUpdates}
                       onSelectStory={handleOpenStoryModal}
                       onSelectChapter={handleOpenChapter}
                       onFilterGenre={(g) => setSelectedGenreFilter(g)}
@@ -704,7 +736,7 @@ export default function App() {
                     <Sidebar
                       stories={stories}
                       announcements={announcements}
-                      recentUpdates={RECENT_UPDATES}
+                      recentUpdates={dynamicRecentUpdates}
                       onSelectStory={handleOpenStoryModal}
                       onSelectChapter={handleOpenChapter}
                       onFilterGenre={(g) => setSelectedGenreFilter(g)}

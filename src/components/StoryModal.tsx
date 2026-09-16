@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import {
   subscribeToStoryStats,
+  subscribeToStoryChapters,
   toggleStoryLike,
   toggleStoryFollow,
   recordStoryView,
@@ -47,11 +48,13 @@ export const StoryModal: React.FC<StoryModalProps> = ({
 
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [isFollowed, setIsFollowed] = useState<boolean>(false);
+  const [liveChapters, setLiveChapters] = useState<Chapter[]>(() => story ? getStoryChapters(story.id) : []);
 
   // Reset tab and sync storage when story changes
   useEffect(() => {
     setChapterFilter('all');
     if (story) {
+      setLiveChapters(getStoryChapters(story.id));
       recordStoryView(story.id);
       try {
         setIsLiked(localStorage.getItem(`mel_liked_story_${story.id}`) === 'true');
@@ -59,6 +62,17 @@ export const StoryModal: React.FC<StoryModalProps> = ({
       } catch {}
     }
   }, [story?.id]);
+
+  // Real-time synchronization of chapters for this story
+  useEffect(() => {
+    if (!story || !isOpen) return;
+    const unsubChapters = subscribeToStoryChapters(story.id, (chs) => {
+      if (chs && chs.length > 0) {
+        setLiveChapters(chs);
+      }
+    });
+    return () => unsubChapters();
+  }, [story?.id, isOpen]);
 
   // Subscribe to realtime stats
   useEffect(() => {
@@ -101,7 +115,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
 
   if (!isOpen || !story) return null;
 
-  const chapters: Chapter[] = getStoryChapters(story.id);
+  const chapters: Chapter[] = liveChapters.length > 0 ? liveChapters : getStoryChapters(story.id);
   const isCompleted = story.status === 'completed';
 
   const mainChapters = chapters.filter((c) => !c.isExtra && c.partType !== 'extra');
