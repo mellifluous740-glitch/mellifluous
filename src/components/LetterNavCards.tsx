@@ -19,7 +19,9 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
   const letters = [
     {
       id: 'completed' as LetterTab,
-      title: 'Truyện đã hoàn thành',
+      title: 'Thư đã gửi',
+      subtitle: 'Đã hoàn thành • Đỡ phải đợi chương mới nèe',
+      desc: 'Một số tác phẩm có Ebook, tớ đã gắn link đồng thời ghi chú rõ rùi nhaa.',
       count: `${completedCount} bộ truyện`,
       // Color: Soft Cherry Blossom Pink
       bgLight: 'bg-gradient-to-br from-pink-50/95 via-rose-50/85 to-pink-100/70',
@@ -37,9 +39,9 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
     },
     {
       id: 'ongoing' as LetterTab,
-      title: 'Truyện chưa hoàn thành',
-      subtitle: 'Đang tiến hành • Đón chờ từng chương mới',
-      desc: 'Cùng Mel đồng hành mỗi tuần, theo dõi từng bước chân ngọt ngào của các nhân vật.',
+      title: 'Thư đang viết',
+      subtitle: 'Đang tiến hành • cùng chúng tớ đón chờ chương mới nhaa',
+      desc: 'Thời gian đăng chương mới không cố định, tùy thuộc vào khối lượng công việc của tớ',
       count: `${ongoingCount} bộ truyện`,
       // Color: Mint / Soft Summer Leaf Green
       bgLight: 'bg-gradient-to-br from-emerald-50/95 via-teal-50/85 to-green-100/70',
@@ -57,9 +59,9 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
     },
     {
       id: 'password' as LetterTab,
-      title: 'Gợi ý Password',
-      subtitle: 'Mật khẩu bảo vệ • Gợi ý giải pass dễ thương',
-      desc: 'Bí kíp mở khóa các chương VIP phi lợi nhuận. Hướng dẫn chi tiết và thử giải mật khẩu.',
+      title: 'Cách nhận thư',
+      subtitle: 'Mật khẩu bảo vệ • Cách nhận khum khó đâuu',
+      desc: 'Mọi người đọc phần này THẬT KỸ NHÉ, có cả tính năng thử mật khẩu đóa.',
       count: 'Quy tắc & Thử pass',
       // Color: Warm Pastel Sunbeam Yellow
       bgLight: 'bg-gradient-to-br from-amber-50/95 via-yellow-50/85 to-amber-100/70',
@@ -77,9 +79,9 @@ export const LetterNavCards: React.FC<LetterNavCardsProps> = ({
     },
     {
       id: 'other' as LetterTab,
-      title: 'Một số mục khác',
-      subtitle: 'Tâm sự chiếc thuyền • Nhạc hè • Góc đọc',
-      desc: 'Góc nhỏ Mel chia sẻ chuyện phiếm, hòm thư thầm kín & công khai cùng playlist thanh xuân.',
+      title: 'Góc nghỉ ngơi',
+      subtitle: 'Gửi tâm tư, tình cảm • Âm nhạc • Quy định',
+      desc: 'Góc nhỏ Mel chia sẻ chuyện phiếm, hòm thư thầm kín & công khai cùng playlist cho mọi người nè.',
       count: 'Hòm thư & Playlist',
       // Color: Sky Blue / Summer Breeze
       bgLight: 'bg-gradient-to-br from-sky-50/95 via-blue-50/85 to-cyan-100/70',
