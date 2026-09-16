@@ -251,8 +251,7 @@ export const AuthModal: React.FC = () => {
                   <span>Hệ thống tài khoản Mellifluous</span>
                 </div>
                 <p className="text-[11px] text-stone-600 dark:text-stone-300 leading-relaxed">
-                  • <strong>Độc giả:</strong> Đăng nhập với bất kỳ tài khoản Gmail nào để gửi tâm sự, bình luận và nhận lời hồi đáp từ Mellifluous.<br />
-                  • <strong>Tác giả & Cộng sự:</strong> Đăng nhập bằng Gmail được chỉ định để tự động nhận quyền Quản trị, đăng bài và trả lời độc giả.
+                  • <strong>Độc giả:</strong> Đăng nhập với bất kỳ tài khoản Gmail để lưu danh sách đọc, gửi tâm sự, bình luận và nhận lời hồi đáp từ Mellifluous. Các tài khoản khách sẽ bị hạn chế một số tính năng.<br />
                 </p>
               </div>
 
@@ -347,7 +346,7 @@ export const AuthModal: React.FC = () => {
                 <form onSubmit={handleGuestSubmit} className="space-y-4 pt-1">
                   <div className="p-3.5 rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 dark:from-stone-800 dark:to-pink-950/20 border border-pink-200/80 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
                     <span className="font-semibold text-pink-700 dark:text-pink-300">🌸 Dành cho độc giả: </span>
-                    Chỉ cần nhập tên gọi hoặc biệt hiệu yêu thích của bạn, không cần đăng ký mật khẩu hay mở cửa sổ pop-up. Bạn có thể bình luận, lưu truyện và gửi tâm sự ngay!
+                    Chỉ cần nhập tên gọi hoặc biệt hiệu mà tình iu muốn hiển thị trên web thui nè
                   </div>
 
                   <div className="space-y-1.5">
