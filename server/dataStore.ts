@@ -317,6 +317,15 @@ const reloadCommentsIfChanged = () => {
             (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
           );
           lastCommentsMtime = stat.mtimeMs;
+        } else if (parsed && typeof parsed === 'object') {
+          const flat: RealtimeComment[] = [];
+          Object.values(parsed).forEach((v) => {
+            if (Array.isArray(v)) flat.push(...(v as RealtimeComment[]));
+          });
+          cachedComments = flat.sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          lastCommentsMtime = stat.mtimeMs;
         }
       }
     }
@@ -880,47 +889,99 @@ let cachedStats: PersistedStats = {
   stories: {},
 };
 
+let lastStatsMtime = 0;
+
+const persistStatsSafe = () => {
+  const payload = {
+    totalVisits: Math.max(1, cachedStats.global.totalVisits || 1),
+    totalFollowers: Math.max(0, cachedStats.global.totalFollowers || 0),
+    totalLikes: Math.max(0, cachedStats.global.totalLikes || 0),
+    totalComments: cachedComments.length,
+    global: {
+      totalVisits: Math.max(1, cachedStats.global.totalVisits || 1),
+      totalFollowers: Math.max(0, cachedStats.global.totalFollowers || 0),
+      totalLikes: Math.max(0, cachedStats.global.totalLikes || 0),
+    },
+    stories: cachedStats.stories || {},
+  };
+  writeJsonSafe(STATS_FILE, payload);
+  try {
+    const destDir = path.join(process.cwd(), 'public', 'data');
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    fs.writeFileSync(path.join(destDir, 'stats.json'), JSON.stringify(payload, null, 2), 'utf-8');
+  } catch {}
+};
+
 const loadStats = () => {
-  const loaded = readJsonSafe<PersistedStats | null>(STATS_FILE, null);
-  if (loaded && loaded.global) {
-    cachedStats = {
-      global: {
-        totalVisits: Number(loaded.global.totalVisits) || 1,
-        totalFollowers: Number(loaded.global.totalFollowers) || 0,
-        totalLikes: Number(loaded.global.totalLikes) || 0,
-      },
-      stories: loaded.stories || {},
-    };
-  } else {
-    cachedStats = {
-      global: { totalVisits: 1, totalFollowers: 0, totalLikes: 0 },
-      stories: {},
-    };
-    writeJsonSafe(STATS_FILE, cachedStats);
-  }
+  try {
+    if (fs.existsSync(STATS_FILE)) {
+      const stat = fs.statSync(STATS_FILE);
+      lastStatsMtime = stat.mtimeMs;
+      const loaded = readJsonSafe<any>(STATS_FILE, null);
+      if (loaded) {
+        const globalData = loaded.global || loaded;
+        cachedStats = {
+          global: {
+            totalVisits: Math.max(1, Number(globalData.totalVisits) || Number(loaded.totalVisits) || 1),
+            totalFollowers: Math.max(0, Number(globalData.totalFollowers) || Number(loaded.totalFollowers) || 0),
+            totalLikes: Math.max(0, Number(globalData.totalLikes) || Number(loaded.totalLikes) || 0),
+          },
+          stories: loaded.stories && typeof loaded.stories === 'object' ? loaded.stories : {},
+        };
+        return;
+      }
+    }
+  } catch {}
+
+  cachedStats = {
+    global: { totalVisits: 1, totalFollowers: 0, totalLikes: 0 },
+    stories: {},
+  };
+  persistStatsSafe();
+};
+
+export const reloadStatsIfChanged = () => {
+  try {
+    if (fs.existsSync(STATS_FILE)) {
+      const stat = fs.statSync(STATS_FILE);
+      if (stat.mtimeMs !== lastStatsMtime) {
+        loadStats();
+      }
+    }
+  } catch {}
 };
 
 loadStats();
 
 export const getGlobalStats = (liveActiveCount?: number) => {
+  reloadStoriesIfChanged();
   reloadCommentsIfChanged();
+  reloadStatsIfChanged();
+  
+  // Calculate sum of likes across all stories as floor for total likes
+  const aggregateStoryLikes = cachedStories.reduce((acc, s) => acc + (Number(s.likes) || 0), 0);
+  const effectiveTotalLikes = Math.max(cachedStats.global.totalLikes || 0, aggregateStoryLikes);
+
   return {
-    totalVisits: cachedStats.global.totalVisits,
-    totalFollowers: cachedStats.global.totalFollowers,
-    totalLikes: cachedStats.global.totalLikes,
+    totalVisits: Math.max(1, cachedStats.global.totalVisits || 1),
+    totalFollowers: Math.max(0, cachedStats.global.totalFollowers || 0),
+    totalLikes: effectiveTotalLikes,
     totalComments: cachedComments.length,
     activeReaders: typeof liveActiveCount === 'number' ? Math.max(1, liveActiveCount) : 1,
   };
 };
 
 export const recordSiteVisit = (): number => {
-  cachedStats.global.totalVisits = (cachedStats.global.totalVisits || 0) + 1;
-  writeJsonSafe(STATS_FILE, cachedStats);
+  reloadStatsIfChanged();
+  cachedStats.global.totalVisits = Math.max(1, (cachedStats.global.totalVisits || 0) + 1);
+  persistStatsSafe();
   return cachedStats.global.totalVisits;
 };
 
 export const getStoryStats = (storyId: string) => {
+  reloadStoriesIfChanged();
   reloadCommentsIfChanged();
+  reloadStatsIfChanged();
   const story = cachedStories.find((s) => s.id === storyId);
   const existing = cachedStats.stories[storyId] || {
     views: story?.views || 0,
@@ -929,6 +990,10 @@ export const getStoryStats = (storyId: string) => {
     ratingSum: 0,
     ratingCount: 0,
   };
+  if (story) {
+    existing.views = Math.max(existing.views, story.views || 0);
+    existing.likes = Math.max(existing.likes, story.likes || 0);
+  }
   const commentCount = cachedComments.filter((c) => c.storyId === storyId).length;
   return {
     ...existing,
@@ -937,8 +1002,10 @@ export const getStoryStats = (storyId: string) => {
 };
 
 export const recordStoryView = (storyId: string) => {
+  reloadStoriesIfChanged();
+  reloadStatsIfChanged();
+  const story = cachedStories.find((s) => s.id === storyId);
   if (!cachedStats.stories[storyId]) {
-    const story = cachedStories.find((s) => s.id === storyId);
     cachedStats.stories[storyId] = {
       views: story?.views || 0,
       likes: story?.likes || 0,
@@ -947,19 +1014,22 @@ export const recordStoryView = (storyId: string) => {
       ratingCount: 0,
     };
   }
-  cachedStats.stories[storyId].views += 1;
+  const currentMax = Math.max(cachedStats.stories[storyId].views || 0, story?.views || 0);
+  cachedStats.stories[storyId].views = currentMax + 1;
   const sIdx = cachedStories.findIndex((s) => s.id === storyId);
   if (sIdx >= 0) {
     cachedStories[sIdx].views = cachedStats.stories[storyId].views;
     writeJsonSafe(STORIES_FILE, cachedStories);
   }
-  writeJsonSafe(STATS_FILE, cachedStats);
+  persistStatsSafe();
   return getStoryStats(storyId);
 };
 
 export const toggleStoryLike = (storyId: string, delta: number) => {
+  reloadStoriesIfChanged();
+  reloadStatsIfChanged();
+  const story = cachedStories.find((s) => s.id === storyId);
   if (!cachedStats.stories[storyId]) {
-    const story = cachedStories.find((s) => s.id === storyId);
     cachedStats.stories[storyId] = {
       views: story?.views || 0,
       likes: story?.likes || 0,
@@ -975,27 +1045,29 @@ export const toggleStoryLike = (storyId: string, delta: number) => {
     cachedStories[sIdx].likes = cachedStats.stories[storyId].likes;
     writeJsonSafe(STORIES_FILE, cachedStories);
   }
-  writeJsonSafe(STATS_FILE, cachedStats);
+  persistStatsSafe();
   return getStoryStats(storyId);
 };
 
 export const toggleStoryFollow = (storyId: string, delta: number) => {
+  reloadStatsIfChanged();
   if (!cachedStats.stories[storyId]) {
     cachedStats.stories[storyId] = { views: 0, likes: 0, followers: 0, ratingSum: 0, ratingCount: 0 };
   }
   cachedStats.stories[storyId].followers = Math.max(0, (cachedStats.stories[storyId].followers || 0) + delta);
   cachedStats.global.totalFollowers = Math.max(0, (cachedStats.global.totalFollowers || 0) + delta);
-  writeJsonSafe(STATS_FILE, cachedStats);
+  persistStatsSafe();
   return getStoryStats(storyId);
 };
 
 export const submitStoryRating = (storyId: string, stars: number) => {
+  reloadStatsIfChanged();
   if (!cachedStats.stories[storyId]) {
     cachedStats.stories[storyId] = { views: 0, likes: 0, followers: 0, ratingSum: 0, ratingCount: 0 };
   }
   cachedStats.stories[storyId].ratingSum = (cachedStats.stories[storyId].ratingSum || 0) + stars;
   cachedStats.stories[storyId].ratingCount = (cachedStats.stories[storyId].ratingCount || 0) + 1;
-  writeJsonSafe(STATS_FILE, cachedStats);
+  persistStatsSafe();
   return getStoryStats(storyId);
 };
 

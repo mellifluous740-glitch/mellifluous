@@ -46,6 +46,10 @@ import { buildApiUrl, hasBackendServer, safeApiFetch } from './apiConfig';
 import { bgmEngine } from '../utils/audioPlayer';
 import { updateGenresFromRemote } from '../utils/genreManager';
 import { getGithubConfig, commitGithubDataFile, fetchRawGithubJson } from './githubSyncService';
+import defaultAnnouncementsJson from '../../data/announcements.json';
+import defaultLettersJson from '../../data/letters.json';
+import defaultCommentsJson from '../../data/comments.json';
+import defaultStatsJson from '../../data/stats.json';
 
 /**
  * Recursively removes all keys with `undefined` value from objects/arrays,
@@ -254,7 +258,58 @@ const activeAllChaptersSubscribers = new Set<(chaptersMap: Record<string, Chapte
 const globalStatsListeners = new Set<(stats: GlobalRealtimeStats) => void>();
 const activeStoryStatsSubscribers = new Map<string, Set<(stats: StoryRealtimeStats) => void>>();
 
+// Story stats in-memory cache and persistence
+const cachedStoryStatsMap = new Map<string, StoryRealtimeStats>();
+
+// Pre-populate story stats from defaultStatsJson and stories
+if (defaultStatsJson && (defaultStatsJson as any).stories && typeof (defaultStatsJson as any).stories === 'object') {
+  for (const [id, s] of Object.entries((defaultStatsJson as any).stories as Record<string, any>)) {
+    cachedStoryStatsMap.set(id, {
+      views: Number(s.views) || 0,
+      likes: Number(s.likes) || 0,
+      followers: Number(s.followers) || 0,
+      ratingSum: Number(s.ratingSum) || 0,
+      ratingCount: Number(s.ratingCount) || 0,
+      commentCount: Number(s.commentCount) || 0,
+    });
+  }
+}
+
+export const getStoredAllStoryStats = (): Record<string, StoryRealtimeStats> => {
+  const result: Record<string, StoryRealtimeStats> = {};
+  cachedStoryStatsMap.forEach((stats, id) => {
+    result[id] = { ...stats };
+  });
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('mel_story_stats_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          for (const [id, s] of Object.entries(parsed)) {
+            if (!result[id]) {
+              result[id] = s as StoryRealtimeStats;
+            } else {
+              result[id].views = Math.max(result[id].views, (s as any).views || 0);
+              result[id].likes = Math.max(result[id].likes, (s as any).likes || 0);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+  return result;
+};
+
 export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtimeStats) => {
+  cachedStoryStatsMap.set(storyId, { ...stats });
+  if (typeof window !== 'undefined') {
+    try {
+      const all = getStoredAllStoryStats();
+      all[storyId] = stats;
+      localStorage.setItem('mel_story_stats_cache', JSON.stringify(all));
+    } catch {}
+  }
   const set = activeStoryStatsSubscribers.get(storyId);
   if (set) {
     set.forEach((cb) => {
@@ -287,12 +342,28 @@ export const updateLiveActiveReaders = (count: number) => {
   });
 };
 
+const defaultVisits =
+  (defaultStatsJson as any)?.global?.totalVisits ??
+  (defaultStatsJson as any)?.totalVisits ??
+  1;
+const defaultFollowers =
+  (defaultStatsJson as any)?.global?.totalFollowers ??
+  (defaultStatsJson as any)?.totalFollowers ??
+  0;
+const defaultLikes =
+  (defaultStatsJson as any)?.global?.totalLikes ??
+  (defaultStatsJson as any)?.totalLikes ??
+  0;
+
 let cachedGlobalStats: GlobalRealtimeStats = {
-  totalVisits: typeof window !== 'undefined' ? Math.max(1, Number(localStorage.getItem('mel_site_visits') || '1')) : 1,
+  totalVisits:
+    typeof window !== 'undefined'
+      ? Math.max(Number(defaultVisits), Number(localStorage.getItem('mel_site_visits') || '1'))
+      : Number(defaultVisits),
   activeReaders: 1,
-  totalFollowers: 0,
-  totalComments: 0,
-  totalLikes: 0,
+  totalFollowers: Number(defaultFollowers),
+  totalComments: Array.isArray(defaultCommentsJson) ? defaultCommentsJson.length : 0,
+  totalLikes: Number(defaultLikes),
 };
 
 export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStats>) => {
@@ -305,6 +376,11 @@ export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStat
     ...partial,
     activeReaders: safeActive,
   };
+  if (typeof window !== 'undefined' && cachedGlobalStats.totalVisits) {
+    try {
+      localStorage.setItem('mel_site_visits', String(cachedGlobalStats.totalVisits));
+    } catch {}
+  }
   globalStatsListeners.forEach((cb) => {
     try {
       cb({ ...cachedGlobalStats });
@@ -404,11 +480,14 @@ export const getStoredAnnouncements = (): Announcement[] => {
     const raw = localStorage.getItem('mel_announcements') || localStorage.getItem('mel_published_announcements');
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.filter((a) => !isAnnouncementDeleted(a.id));
       }
     }
   } catch {}
+  if (Array.isArray(defaultAnnouncementsJson) && defaultAnnouncementsJson.length > 0) {
+    return (defaultAnnouncementsJson as unknown as Announcement[]).filter((a) => !isAnnouncementDeleted(a.id));
+  }
   return ANNOUNCEMENTS.filter((a) => !isAnnouncementDeleted(a.id));
 };
 
@@ -534,11 +613,14 @@ export function getStoredReaderLetters(): ReaderLetter[] {
     const raw = localStorage.getItem('mel_reader_letters_cache');
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.filter((l) => l && l.id && !isLetterDeleted(l.id));
       }
     }
   } catch {}
+  if (Array.isArray(defaultLettersJson) && defaultLettersJson.length > 0) {
+    return (defaultLettersJson as unknown as ReaderLetter[]).filter((l) => l && l.id && !isLetterDeleted(l.id));
+  }
   return INITIAL_SAMPLE_LETTERS.filter((l) => l && l.id && !isLetterDeleted(l.id));
 }
 
@@ -571,14 +653,26 @@ export function getStoredComments(storyId: string): RealtimeComment[] {
     const raw = localStorage.getItem(`mel_comments_${storyId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
+  if (Array.isArray(defaultCommentsJson)) {
+    return (defaultCommentsJson as unknown as RealtimeComment[]).filter(
+      (c) => c && c.storyId === storyId && !isStoryDeleted(c.storyId)
+    );
+  }
   return [];
 }
 
 export function getAllStoredComments(): RealtimeComment[] {
   const map = new Map<string, RealtimeComment>();
+  if (Array.isArray(defaultCommentsJson)) {
+    defaultCommentsJson.forEach((c: any) => {
+      if (c && c.id && !isStoryDeleted(c.storyId)) {
+        map.set(c.id, c as RealtimeComment);
+      }
+    });
+  }
   if (typeof window !== 'undefined') {
     try {
       const keysToRemove: string[] = [];
@@ -1352,6 +1446,38 @@ export const subscribeToGlobalStats = (
       .catch(() => {});
   }
 
+  // 2b. Pull freshest stats.json from GitHub as reliable cloud backup
+  fetchRawGithubJson<any>('stats.json')
+    .then((ghStats) => {
+      if (ghStats) {
+        const globalData = ghStats.global || ghStats;
+        notifyGlobalStatsSubscribers({
+          totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(globalData.totalVisits) || 1),
+          totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0),
+          totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(globalData.totalLikes) || 0),
+          totalComments: Math.max(cachedGlobalStats.totalComments, Number(globalData.totalComments) || 0),
+        });
+        if (ghStats.stories && typeof ghStats.stories === 'object') {
+          for (const [sId, st] of Object.entries(ghStats.stories as Record<string, any>)) {
+            const current = cachedStoryStatsMap.get(sId) || {
+              views: 0,
+              likes: 0,
+              followers: 0,
+              ratingSum: 0,
+              ratingCount: 0,
+              commentCount: 0,
+            };
+            notifyStoryStatsSubscribers(sId, {
+              ...current,
+              views: Math.max(current.views, Number(st.views) || 0),
+              likes: Math.max(current.likes, Number(st.likes) || 0),
+            });
+          }
+        }
+      }
+    })
+    .catch(() => {});
+
   // 3. Firestore snapshot with auto-reconnect on quota reset
   let unsubFirestore: (() => void) | null = null;
   const startGlobalStatsFs = () => {
@@ -1398,13 +1524,14 @@ export const subscribeToStoryStats = (
   initialLikes: number = 0,
   callback: (stats: StoryRealtimeStats) => void
 ): (() => void) => {
+  const cached = cachedStoryStatsMap.get(storyId);
   const initialData: StoryRealtimeStats = {
-    views: initialViews || 0,
-    likes: initialLikes || 0,
-    followers: 0,
-    ratingSum: 0,
-    ratingCount: 0,
-    commentCount: 0,
+    views: Math.max(initialViews || 0, cached?.views || 0),
+    likes: Math.max(initialLikes || 0, cached?.likes || 0),
+    followers: cached?.followers || 0,
+    ratingSum: cached?.ratingSum || 0,
+    ratingCount: cached?.ratingCount || 0,
+    commentCount: cached?.commentCount || 0,
   };
   callback(initialData);
 
@@ -1419,7 +1546,11 @@ export const subscribeToStoryStats = (
       .then((res) => (res && res.ok ? res.json() : null))
       .then((stats) => {
         if (stats) {
-          notifyStoryStatsSubscribers(storyId, stats);
+          notifyStoryStatsSubscribers(storyId, {
+            ...stats,
+            views: Math.max(stats.views || 0, initialData.views),
+            likes: Math.max(stats.likes || 0, initialData.likes),
+          });
         }
       })
       .catch(() => {});
@@ -1436,8 +1567,8 @@ export const subscribeToStoryStats = (
           if (docSnap.exists()) {
             const data = docSnap.data();
             const stats: StoryRealtimeStats = {
-              views: data.views !== undefined ? Number(data.views) : (initialViews || 0),
-              likes: data.likes !== undefined ? Number(data.likes) : (initialLikes || 0),
+              views: data.views !== undefined ? Number(data.views) : (initialData.views || 0),
+              likes: data.likes !== undefined ? Number(data.likes) : (initialData.likes || 0),
               followers: data.followers ?? 0,
               ratingSum: data.ratingSum ?? 0,
               ratingCount: data.ratingCount ?? 0,
@@ -1468,6 +1599,21 @@ export const recordStoryView = async (storyId: string): Promise<void> => {
     const sessionKey = `mel_viewed_story_${storyId}`;
     if (sessionStorage.getItem(sessionKey)) return;
     sessionStorage.setItem(sessionKey, 'true');
+
+    // Optimistic local increment
+    const current = cachedStoryStatsMap.get(storyId) || {
+      views: 0,
+      likes: 0,
+      followers: 0,
+      ratingSum: 0,
+      ratingCount: 0,
+      commentCount: 0,
+    };
+    const updated = {
+      ...current,
+      views: (current.views || 0) + 1,
+    };
+    notifyStoryStatsSubscribers(storyId, updated);
 
     // 1. Server Engine view tracking (instant & reliable)
     if (hasBackendServer()) {

@@ -1,6 +1,7 @@
 import { Story, Chapter, Announcement, RecentUpdate } from '../types';
 import defaultStoriesJson from '../../data/stories.json';
 import defaultChaptersJson from '../../data/chapters.json';
+import defaultAnnouncementsJson from '../../data/announcements.json';
 
 export const DELETED_OR_LEGACY_STORY_IDS = new Set([
   'anh-dao-nam-centimet',
@@ -198,7 +199,7 @@ export const deleteCustomChapterFromStorage = (storyId: string, chapterId: strin
 };
 
 // Live synchronized chapters cache from Firestore across all devices and clients
-const liveChaptersRuntimeCache: Record<string, Chapter[]> = {};
+const liveChaptersRuntimeCache: Record<string, Chapter[]> = { ...SAMPLE_CHAPTERS };
 
 export const setLiveChaptersRuntimeCache = (cache: Record<string, Chapter[]>): void => {
   for (const [storyId, list] of Object.entries(cache)) {
@@ -270,7 +271,16 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
   return [];
 };
 
-export const ANNOUNCEMENTS: Announcement[] = [];
+const parseDefaultAnnouncements = (): Announcement[] => {
+  if (Array.isArray(defaultAnnouncementsJson) && defaultAnnouncementsJson.length > 0) {
+    return (defaultAnnouncementsJson as unknown as Announcement[]).filter(
+      (a) => a && a.id && !isAnnouncementDeleted(a.id)
+    );
+  }
+  return [];
+};
+
+export const ANNOUNCEMENTS: Announcement[] = parseDefaultAnnouncements();
 
 export const RECENT_UPDATES: RecentUpdate[] = [];
 

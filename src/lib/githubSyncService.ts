@@ -17,14 +17,14 @@ export interface GithubConfig {
 }
 
 const STORAGE_CONFIG_KEY = 'mel_github_config_v1';
-export const DEFAULT_REPO = 'mellifluous740-glitch/betterandbetter';
+export const DEFAULT_REPO = 'mellifluous740-glitch/mellifluous';
 export const DEFAULT_BRANCH = 'main';
 
 /**
  * Automatically detects the authoritative repository (owner/repo):
  * 1. Explicit user configuration in localStorage (if valid and not obsolete legacy placeholder)
  * 2. Automatic detection from GitHub Pages URL (e.g. username.github.io/reponame)
- * 3. Default fallback to mellifluous740-glitch/betterandbetter
+ * 3. Default fallback to mellifluous740-glitch/mellifluous
  */
 export const resolveAuthoritativeRepo = (): string => {
   if (typeof window !== 'undefined') {
@@ -48,9 +48,9 @@ export const resolveAuthoritativeRepo = (): string => {
     if (window.location.hostname.endsWith('.github.io')) {
       const owner = window.location.hostname.replace('.github.io', '');
       const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const repoName = pathParts[0] || 'betterandbetter';
+      const repoName = pathParts[0] || 'mellifluous';
       if (owner === 'mellifluous740' || owner === 'mellifluous740-glitch') {
-        return 'mellifluous740-glitch/betterandbetter';
+        return `mellifluous740-glitch/${repoName}`;
       }
       return `${owner}/${repoName}`;
     }
@@ -213,8 +213,11 @@ export async function fetchRawGithubJson<T>(filename: string): Promise<T | null>
   // Add cache buster to guarantee freshest data on every fetch
   const cacheBuster = Date.now();
   const candidateRepos = [repo];
-  if (repo !== DEFAULT_REPO) {
-    candidateRepos.push(DEFAULT_REPO);
+  if (!candidateRepos.includes('mellifluous740-glitch/mellifluous')) {
+    candidateRepos.push('mellifluous740-glitch/mellifluous');
+  }
+  if (!candidateRepos.includes('mellifluous740-glitch/betterandbetter')) {
+    candidateRepos.push('mellifluous740-glitch/betterandbetter');
   }
 
   for (const r of candidateRepos) {
@@ -689,10 +692,24 @@ export async function backupInteractiveDataToGithub(customData?: {
     }
 
     // 3. Commit stats.json
+    const { getStoredAllStoryStats } = await import('./realtimeService');
+    const storiesStats = typeof (stats as any).stories === 'object' ? (stats as any).stories : getStoredAllStoryStats();
+    const fullStats = {
+      totalVisits: Math.max(1, stats.totalVisits || 1),
+      totalFollowers: Math.max(0, stats.totalFollowers || 0),
+      totalLikes: Math.max(0, stats.totalLikes || 0),
+      totalComments: comments.length,
+      global: {
+        totalVisits: Math.max(1, stats.totalVisits || 1),
+        totalFollowers: Math.max(0, stats.totalFollowers || 0),
+        totalLikes: Math.max(0, stats.totalLikes || 0),
+      },
+      stories: storiesStats || {},
+    };
     await commitGithubDataFile(
       'stats.json',
-      stats,
-      `Cập nhật thống kê tương tác (lượt xem & lượt ghé thăm) [skip ci]`
+      fullStats,
+      `Cập nhật thống kê tương tác (${fullStats.totalVisits} lượt ghé thăm) [skip ci]`
     );
 
     const nowIso = new Date().toISOString();
