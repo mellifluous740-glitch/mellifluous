@@ -666,10 +666,22 @@ export async function backupInteractiveDataToGithub(customData?: {
   }
 
   try {
-    const { getAllStoredComments, getStoredReaderLetters, getGlobalStats } = await import('./realtimeService');
+    const { getAllStoredComments, getStoredReaderLetters, getGlobalStats, getStoredAllStoryStats } = await import('./realtimeService');
     const comments = customData?.comments || getAllStoredComments();
     const letters = customData?.letters || getStoredReaderLetters();
     const stats = customData?.stats || getGlobalStats();
+
+    // Fetch cloud consolidated stats from Firestore if available
+    let cloudStats: any = null;
+    try {
+      const { db, doc, getDoc, isFirestoreQuotaExhausted } = await import('./firebase');
+      if (!isFirestoreQuotaExhausted()) {
+        const snap = await getDoc(doc(db, 'site_stats', 'aggregate_stats'));
+        if (snap && snap.exists()) {
+          cloudStats = snap.data();
+        }
+      }
+    } catch {}
 
     // 1. Commit comments.json
     const resComments = await commitGithubDataFile(
@@ -691,20 +703,42 @@ export async function backupInteractiveDataToGithub(customData?: {
       throw new Error(`Lỗi cập nhật letters.json: ${resLetters.error}`);
     }
 
-    // 3. Commit stats.json
-    const { getStoredAllStoryStats } = await import('./realtimeService');
+    // 3. Commit stats.json (consolidated master stats)
     const storiesStats = typeof (stats as any).stories === 'object' ? (stats as any).stories : getStoredAllStoryStats();
+    const mergedVisits = Math.max(1, stats.totalVisits || 1, Number(cloudStats?.totalVisits) || 0);
+    const mergedFollowers = Math.max(0, stats.totalFollowers || 0, Number(cloudStats?.totalFollowers) || 0);
+    const mergedLikes = Math.max(0, stats.totalLikes || 0, Number(cloudStats?.totalLikes) || 0);
+    const mergedComments = Math.max(comments.length, Number(cloudStats?.totalComments) || 0);
+
+    const mergedStories: Record<string, any> = { ...(storiesStats || {}) };
+    if (cloudStats?.stories && typeof cloudStats.stories === 'object') {
+      for (const [sId, st] of Object.entries(cloudStats.stories as Record<string, any>)) {
+        if (st && typeof st === 'object') {
+          const localS = mergedStories[sId] || {};
+          mergedStories[sId] = {
+            views: Math.max(Number(localS.views) || 0, Number(st.views) || 0),
+            likes: Math.max(Number(localS.likes) || 0, Number(st.likes) || 0),
+            followers: Math.max(Number(localS.followers) || 0, Number(st.followers) || 0),
+            ratingSum: Math.max(Number(localS.ratingSum) || 0, Number(st.ratingSum) || 0),
+            ratingCount: Math.max(Number(localS.ratingCount) || 0, Number(st.ratingCount) || 0),
+            commentCount: Math.max(Number(localS.commentCount) || 0, Number(st.commentCount) || 0),
+          };
+        }
+      }
+    }
+
     const fullStats = {
-      totalVisits: Math.max(1, stats.totalVisits || 1),
-      totalFollowers: Math.max(0, stats.totalFollowers || 0),
-      totalLikes: Math.max(0, stats.totalLikes || 0),
-      totalComments: comments.length,
+      totalVisits: mergedVisits,
+      totalFollowers: mergedFollowers,
+      totalLikes: mergedLikes,
+      totalComments: mergedComments,
       global: {
-        totalVisits: Math.max(1, stats.totalVisits || 1),
-        totalFollowers: Math.max(0, stats.totalFollowers || 0),
-        totalLikes: Math.max(0, stats.totalLikes || 0),
+        totalVisits: mergedVisits,
+        totalFollowers: mergedFollowers,
+        totalLikes: mergedLikes,
       },
-      stories: storiesStats || {},
+      stories: mergedStories,
+      updatedAt: new Date().toISOString(),
     };
     await commitGithubDataFile(
       'stats.json',

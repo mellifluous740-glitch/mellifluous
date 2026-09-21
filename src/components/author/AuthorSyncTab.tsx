@@ -751,16 +751,16 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
         <div className="p-3.5 rounded-xl bg-stone-50 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700/80 text-xs text-stone-600 dark:text-stone-300 space-y-1.5">
           <div className="flex items-center justify-between flex-wrap gap-2 text-[11px]">
             <span className="font-medium text-stone-700 dark:text-stone-200">
-              Tệp lưu trữ trên GitHub: <code className="text-pink-600 dark:text-pink-400 font-mono">data/comments.json</code> & <code className="text-pink-600 dark:text-pink-400 font-mono">data/letters.json</code>
+              Tệp lưu trữ trên GitHub: <code className="text-pink-600 dark:text-pink-400 font-mono">data/stats.json</code>, <code className="text-pink-600 dark:text-pink-400 font-mono">data/comments.json</code> & <code className="text-pink-600 dark:text-pink-400 font-mono">data/letters.json</code>
             </span>
             <span className="text-stone-400 dark:text-stone-500">
               Lần gom đợt gần nhất: {ghConfig.lastInteractiveSyncTime ? new Date(ghConfig.lastInteractiveSyncTime).toLocaleString('vi-VN') : 'Chưa có'}
             </span>
           </div>
           <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
-            • <strong>Trải nghiệm bạn đọc:</strong> Độc giả khắp nơi khi đọc truyện, đăng bình luận hay gửi thư không cần tạo tài khoản hay đăng nhập. Bình luận hiển thị ngay lập tức (0ms).<br />
-            • <strong>Thông báo Quản trị viên:</strong> Bạn và các cộng sự ngay khi mở trang web sẽ thấy ngay thông báo ở biểu tượng Chuông báo trên thanh điều hướng.<br />
-            • <strong>Cơ chế Gom đợt:</strong> Định kì mỗi 15-20 phút (hoặc khi bạn bấm nút trên), hệ thống tự động gom toàn bộ bình luận & thư mới nhất đẩy lên GitHub để lưu trữ vĩnh viễn và đồng bộ cho tất cả các máy khác khi tải lại trang!
+            • <strong>Kiến trúc gom gọn 1 Document:</strong> Toàn bộ lượt xem, thích, theo dõi và đánh giá của tất cả truyện được gom gọn vào 1 document Firestore duy nhất (tiết kiệm &gt;90% quota so với trước đây).<br />
+            • <strong>Trải nghiệm bạn đọc:</strong> Độc giả khắp nơi khi đọc truyện, thả tim hay bình luận không cần tài khoản. Tương tác cập nhật theo thời gian thực tức thì.<br />
+            • <strong>Cơ chế Gom đợt:</strong> Định kì mỗi 15-20 phút (hoặc khi bấm nút trên), hệ thống tự động gom toàn bộ lượt xem, thích, bình luận & thư mới nhất đẩy lên GitHub để lưu trữ vĩnh viễn và làm mốc thống kê gốc cho toàn trang!
           </p>
         </div>
       </div>

@@ -9,6 +9,7 @@
         "activeReaders": { "type": "number", "description": "Current active reader heartbeat count" },
         "totalFollowers": { "type": "number", "description": "Total newsletter/story followers" },
         "totalComments": { "type": "number", "description": "Total reader comments count" },
+        "stories": { "type": "object", "description": "Consolidated per-story statistics map (views, likes, followers, ratings, comments)" },
         "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
       },
       "required": ["totalVisits"]
