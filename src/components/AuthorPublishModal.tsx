@@ -34,6 +34,8 @@ import {
   Search,
   Plus,
   Database,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import {
   publishStory,
@@ -57,6 +59,7 @@ import { AuthorCollaboratorsTab } from './author/AuthorCollaboratorsTab';
 import { AuthorSyncTab } from './author/AuthorSyncTab';
 import { AuthorCommentsTab } from './author/AuthorCommentsTab';
 import { getCustomGenres, subscribeToCustomGenres, getStoryGenres, addCustomGenre } from '../utils/genreManager';
+import { isoToDateTimeLocal, dateTimeLocalToIso } from '../utils/dateUtils';
 
 interface AuthorPublishModalProps {
   isOpen: boolean;
@@ -183,6 +186,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
   const [passwordHint, setPasswordHint] = useState('');
   const [passwordKey, setPasswordKey] = useState('');
   const [totalChapters, setTotalChapters] = useState(30);
+  const [storyPublishDateInput, setStoryPublishDateInput] = useState(() => isoToDateTimeLocal(new Date().toISOString()));
 
   // New Chapter Form State
   const [targetStoryId, setTargetStoryId] = useState(stories[0]?.id || '');
@@ -194,6 +198,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
   const [isChapterLocked, setIsChapterLocked] = useState(false);
   const [chapterPasswordHint, setChapterPasswordHint] = useState('');
   const [chapterPasswordKey, setChapterPasswordKey] = useState('');
+  const [chapterPublishDateInput, setChapterPublishDateInput] = useState(() => isoToDateTimeLocal(new Date().toISOString()));
 
   // Sync targetStoryId if stories list updates
   useEffect(() => {
