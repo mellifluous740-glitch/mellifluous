@@ -1,69 +1,138 @@
 [
   {
-    "id": "comm_1789667569971_57mq9",
-    "storyId": "chao-tiep-ha",
-    "chapterNumber": 2,
-    "chapterId": "chao-tiep-ha-c2",
-    "user": "Bạn đọc yêu truyện",
+    "id": "comm_1789816377266_fwdr6",
+    "storyId": "huong-dan-lang-phi-tinh-yeu",
+    "user": "huhu",
+    "userEmail": null,
+    "userId": "reader_1789816291239_tf9va",
     "isAuthor": false,
     "isCollaborator": false,
+    "roleBadge": null,
     "avatar": "🌸",
-    "text": "okvaccddiien vãi",
+    "text": "test típ",
+    "createdAt": "2026-09-19T11:12:57.266Z",
+    "rating": null,
+    "likes": 2,
+    "likedBy": [
+      "jMI76kLj55PM1CXXSjAxefROs3q1",
+      "reader_1789816291239_tf9va"
+    ],
+    "replies": [
+      {
+        "text": "ok test",
+        "likedBy": [
+          "reader_1789816291239_tf9va"
+        ],
+        "id": "rep_1789816391584_clz6i",
+        "createdAt": "2026-09-19T11:13:11.584Z",
+        "replyToUser": "huhu",
+        "isCollaborator": true,
+        "user": "Lâm Ly Lục",
+        "userEmail": "luclamly920@gmail.com",
+        "avatar": "🌿",
+        "isAuthor": false,
+        "roleBadge": "Cộng sự",
+        "likes": 1
+      }
+    ]
+  },
+  {
+    "id": "comm_1789814889852_gtjgj",
+    "storyId": "huong-dan-lang-phi-tinh-yeu",
+    "user": "Linh Nguyễn",
+    "userEmail": "nguyenlinhph0210@gmail.com",
+    "userId": "lytMfCKD4GMU73fq72T6DMYycCK2",
+    "isAuthor": false,
+    "isCollaborator": true,
+    "roleBadge": "Cộng sự",
+    "avatar": "🌿",
+    "text": "Ồ dê tốt rồi",
+    "createdAt": "2026-09-19T10:48:09.852Z",
+    "rating": null,
+    "likes": 2,
+    "likedBy": [
+      "jMI76kLj55PM1CXXSjAxefROs3q1",
+      "reader_1789816291239_tf9va"
+    ],
+    "replies": [
+      {
+        "userEmail": null,
+        "avatar": "💬",
+        "text": "Non",
+        "likedBy": [
+          "reader_1789816291239_tf9va"
+        ],
+        "isAuthor": false,
+        "replyToUser": "Linh Nguyễn",
+        "isCollaborator": false,
+        "user": "Bạn đọc",
+        "likes": 1,
+        "id": "rep_1789814895741_wwz1t",
+        "createdAt": "2026-09-19T10:48:15.741Z"
+      }
+    ]
+  },
+  {
+    "id": "comm_1789814032779_xy5u9",
+    "storyId": "khac-ten-anh-len-bia-mo-cua-em",
+    "chapterId": "khac-ten-anh-len-bia-mo-cua-em-c1",
+    "chapterNumber": 1,
+    "user": "Haja",
+    "userEmail": null,
+    "userId": null,
+    "isAuthor": false,
+    "isCollaborator": false,
+    "roleBadge": null,
+    "avatar": "🌸",
+    "text": "heluuu",
+    "createdAt": "2026-09-19T10:33:52.779Z",
+    "rating": null,
     "likes": 0,
     "likedBy": [],
     "replies": [
       {
-        "user": "Độc giả",
-        "avatar": "🌟",
-        "text": "Phản hồi thử nghiệm",
-        "isAuthor": false
+        "avatar": "💬",
+        "createdAt": "2026-09-19T11:40:05.647Z",
+        "isCollaborator": false,
+        "id": "rep_1789818005647_ekddr",
+        "likedBy": [],
+        "text": "uk",
+        "user": "Bạn đọc",
+        "likes": 0,
+        "replyToUser": "Haja",
+        "isAuthor": false,
+        "userEmail": null
+      },
+      {
+        "replyToUser": "Bạn đọc",
+        "text": "oo kaf",
+        "replyToId": "rep_1789818005647_ekddr",
+        "likes": 0,
+        "isCollaborator": false,
+        "user": "huhu",
+        "id": "rep_1789818016374_5fh5d",
+        "createdAt": "2026-09-19T11:40:16.374Z",
+        "roleBadge": "Độc giả",
+        "isAuthor": false,
+        "likedBy": [],
+        "avatar": "💬",
+        "userEmail": null
+      },
+      {
+        "likedBy": [],
+        "roleBadge": "Cộng sự",
+        "userEmail": "luclamly920@gmail.com",
+        "replyToUser": "huhu",
+        "createdAt": "2026-09-19T11:40:36.234Z",
+        "isCollaborator": true,
+        "user": "Lâm Ly Lục",
+        "avatar": "🌿",
+        "replyToId": "rep_1789818016374_5fh5d",
+        "likes": 0,
+        "text": "oo hihi",
+        "isAuthor": false,
+        "id": "rep_1789818036234_3azy9"
       }
-    ],
-    "createdAt": "2026-09-17T17:52:49.971Z"
-  },
-  {
-    "id": "comm_1789667553159_4j73w",
-    "storyId": "chao-tiep-ha",
-    "chapterNumber": 2,
-    "chapterId": "chao-tiep-ha-c2",
-    "user": "Bạn đọc yêu truyện",
-    "isAuthor": false,
-    "isCollaborator": false,
-    "avatar": "🌸",
-    "text": "vacc",
-    "likes": 0,
-    "likedBy": [],
-    "replies": [],
-    "createdAt": "2026-09-17T17:52:33.159Z"
-  },
-  {
-    "id": "comm_1789667545062_v2w3w",
-    "storyId": "chao-tiep-ha",
-    "chapterNumber": 1,
-    "chapterId": "chao-tiep-ha-c1",
-    "user": "Bạn đọc yêu truyện",
-    "isAuthor": false,
-    "isCollaborator": false,
-    "avatar": "🌸",
-    "text": "à ok",
-    "likes": 0,
-    "likedBy": [],
-    "replies": [],
-    "createdAt": "2026-09-17T17:52:25.062Z"
-  },
-  {
-    "id": "comm_1789666643050_s94md",
-    "storyId": "chao-tiep-ha",
-    "chapterNumber": 1,
-    "chapterId": "chao-tiep-ha-c1",
-    "user": "Bạn đọc yêu truyện",
-    "isAuthor": false,
-    "isCollaborator": false,
-    "avatar": "🌸",
-    "text": "tr má",
-    "likes": 0,
-    "likedBy": [],
-    "replies": [],
-    "createdAt": "2026-09-17T17:37:23.050Z"
+    ]
   }
 ]

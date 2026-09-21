@@ -1290,17 +1290,23 @@ export const isPublicOfficialSite = (): boolean => {
 
 /**
  * Record a real visit across any device and browser.
- * Only begins counting visits when accessed via the official public link / domain.
- * Starts from 1 (the first real public visitor) instead of arbitrary numbers.
- * Only increments totalVisits once per browser session.
+ * Uses a standard 30-minute session window to prevent duplicate refreshes
+ * while reliably counting return visits and new visitors.
  */
 export const recordSiteVisit = async (): Promise<void> => {
   try {
     const sessionKey = 'mel_visited_recorded';
-    const alreadyRecorded = sessionStorage.getItem(sessionKey);
+    const lastVisitKey = 'mel_last_visit_timestamp';
+    const now = Date.now();
+    const lastVisit = Number(sessionStorage.getItem(lastVisitKey) || 0);
 
-    if (!alreadyRecorded) {
+    // Standard session window: 30 minutes
+    const isNewSession = !sessionStorage.getItem(sessionKey);
+    const isExpiredSession = now - lastVisit > 30 * 60 * 1000;
+
+    if (isNewSession || isExpiredSession) {
       sessionStorage.setItem(sessionKey, 'true');
+      sessionStorage.setItem(lastVisitKey, String(now));
 
       // 1. Server Engine visit tracking (instant and quota-free)
       if (hasBackendServer()) {
@@ -1729,14 +1735,28 @@ export const subscribeToStoryStats = (
 };
 
 /**
- * Increment story views when a reader views the story details or chapters.
- * Uses atomic Firestore setDoc merge with increment(1) to avoid redundant getDoc reads.
+ * Increment story views when a reader views the story details or reads chapters.
+ * Supports smart cooldown (prevents rapid spam while rewarding genuine chapter progression).
+ * Synchronized across Server Engine, Firestore, and memory cache.
  */
-export const recordStoryView = async (storyId: string): Promise<void> => {
+export const recordStoryView = async (storyId: string, chapterNumber?: number): Promise<void> => {
   try {
-    const sessionKey = `mel_viewed_story_${storyId}`;
-    if (sessionStorage.getItem(sessionKey)) return;
+    const now = Date.now();
+    const chapterSuffix = chapterNumber !== undefined ? `_c${chapterNumber}` : '';
+    const sessionKey = `mel_viewed_story_${storyId}${chapterSuffix}`;
+    const lastTimeKey = `mel_view_time_${storyId}${chapterSuffix}`;
+
+    const lastTime = Number(sessionStorage.getItem(lastTimeKey) || 0);
+    // 5-minute cooldown per chapter / story overview to avoid rapid clicking spam,
+    // while accurately recording when readers read each chapter or return to read more.
+    const cooldownMs = 5 * 60 * 1000;
+
+    if (sessionStorage.getItem(sessionKey) && now - lastTime < cooldownMs) {
+      return;
+    }
+
     sessionStorage.setItem(sessionKey, 'true');
+    sessionStorage.setItem(lastTimeKey, String(now));
 
     // Optimistic local increment
     const current = cachedStoryStatsMap.get(storyId) || {

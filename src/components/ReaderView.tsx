@@ -323,8 +323,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
   // Subscribe to realtime chapter/story comments & stats
   useEffect(() => {
-    // Record view in firestore
-    recordStoryView(story.id);
+    // Record view for story and chapter
+    recordStoryView(story.id, chapter.chapterNumber);
 
     // Subscribe to comments for this specific chapter or story
     const unsubscribeComments = subscribeToComments(story.id, chapter.chapterNumber, (list) => {
