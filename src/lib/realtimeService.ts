@@ -1264,24 +1264,19 @@ export const recordSiteVisit = async (): Promise<void> => {
         safeApiFetch('/api/stats/visit', { method: 'POST' }).catch(() => {});
       }
 
-      // 2. Firestore cloud sync only if explicitly enabled
-      if (!checkIsFirestoreBlocked()) {
+      // 2. Firestore cloud sync (persistent cross-instance aggregation)
+      if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
         const statsDocRef = doc(db, 'site_stats', STATS_DOC_ID);
-        const docSnap = await getDoc(statsDocRef);
-        if (!docSnap.exists()) {
-          await setDoc(statsDocRef, {
-            totalVisits: 1,
-            totalFollowers: 0,
-            totalComments: 0,
-            totalLikes: 0,
-            lastVisitAt: new Date().toISOString(),
-          }).catch(() => {});
-        } else {
-          await updateDoc(statsDocRef, {
+        setDoc(
+          statsDocRef,
+          {
             totalVisits: increment(1),
             lastVisitAt: new Date().toISOString(),
-          }).catch(() => {});
-        }
+          },
+          { merge: true }
+        ).catch((err) => {
+          flagFirestoreQuotaExceeded(err);
+        });
       }
     }
   } catch (err) {
@@ -1291,7 +1286,7 @@ export const recordSiteVisit = async (): Promise<void> => {
 
 /**
  * Realtime Presence Heartbeat: Keeps track of actual active readers online right now.
- * Dual-backed: HTTP presence heartbeats to Server Engine + Firestore reader_presences for multi-instance distributed sync.
+ * Dual-backed: Server Engine HTTP heartbeats + Firestore reader_presences for multi-instance distributed sync.
  */
 export const startActiveReaderHeartbeat = (onCountChange: (count: number) => void): (() => void) => {
   activeReaderSubscribers.add(onCountChange);
@@ -1318,20 +1313,20 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
         .catch(() => {});
     }
 
-    // B. Firestore distributed presence sync across multiple cloud containers
+    // B. Firestore presence heartbeat
     if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
-      try {
-        const presenceDocRef = doc(db, ACTIVE_PRESENCE_COLLECTION, visitorId);
-        setDoc(
-          presenceDocRef,
-          {
-            visitorId,
-            lastSeen: Date.now(),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        ).catch(() => {});
-      } catch {}
+      const presenceDocRef = doc(db, ACTIVE_PRESENCE_COLLECTION, visitorId);
+      setDoc(
+        presenceDocRef,
+        {
+          visitorId,
+          lastSeen: Date.now(),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
     }
   };
 
@@ -1381,9 +1376,10 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
       });
   }
 
-  // 3. Firestore snapshot for multi-device / distributed instance tracking
+  // 3. Firestore snapshot for multi-device presence synchronization
   let unsubFirestorePresence: (() => void) | null = null;
-  if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
+  const startFsPresence = () => {
+    if (unsubFirestorePresence || !isFirestoreEnabled() || checkIsFirestoreBlocked()) return;
     try {
       const presencesCol = collection(db, ACTIVE_PRESENCE_COLLECTION);
       unsubFirestorePresence = onSnapshot(
@@ -1402,14 +1398,27 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
             updateLiveActiveReaders(Math.max(firestoreActive, currentLiveActiveReaders));
           }
         },
-        () => {}
+        (err) => {
+          flagFirestoreQuotaExceeded(err);
+        }
       );
-    } catch {}
-  }
+    } catch (err) {
+      flagFirestoreQuotaExceeded(err);
+    }
+  };
+
+  startFsPresence();
+  const unsubPresenceReset = onFirestoreQuotaReset(() => {
+    startFsPresence();
+  });
 
   return () => {
     activeReaderSubscribers.delete(onCountChange);
     clearInterval(heartbeatTimer);
+    unsubPresenceReset();
+    if (unsubFirestorePresence) {
+      unsubFirestorePresence();
+    }
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibility);
     }
@@ -1417,15 +1426,12 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
       window.removeEventListener('pagehide', handleLeave);
       window.removeEventListener('beforeunload', handleLeave);
     }
-    if (unsubFirestorePresence) {
-      unsubFirestorePresence();
-    }
   };
 };
 
 /**
  * Subscribe to global site statistics in real time.
- * Defaults to Server Engine (instant, accurate, quota-free).
+ * Tri-backed: Firestore cloud synchronization + Server Engine (SSE/REST) + GitHub cloud backup.
  */
 export const subscribeToGlobalStats = (
   callback: (stats: GlobalRealtimeStats) => void
@@ -1434,51 +1440,57 @@ export const subscribeToGlobalStats = (
   callback({ ...cachedGlobalStats, activeReaders: Math.max(1, currentLiveActiveReaders) });
   globalStatsListeners.add(callback);
 
-  // 2. Fetch latest stats from Server Engine
-  if (hasBackendServer()) {
-    safeApiFetch('/api/stats')
-      .then((res) => (res && res.ok ? res.json() : null))
-      .then((stats) => {
-        if (stats) {
-          notifyGlobalStatsSubscribers(stats);
+  const fetchGlobalStatsNow = () => {
+    // 2a. Fetch latest stats from Server Engine
+    if (hasBackendServer()) {
+      safeApiFetch('/api/stats')
+        .then((res) => (res && res.ok ? res.json() : null))
+        .then((stats) => {
+          if (stats) {
+            notifyGlobalStatsSubscribers(stats);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 2b. Pull freshest stats.json from GitHub as reliable cloud backup
+    fetchRawGithubJson<any>('stats.json')
+      .then((ghStats) => {
+        if (ghStats) {
+          const globalData = ghStats.global || ghStats;
+          notifyGlobalStatsSubscribers({
+            totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(globalData.totalVisits) || 1),
+            totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0),
+            totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(globalData.totalLikes) || 0),
+            totalComments: Math.max(cachedGlobalStats.totalComments, Number(globalData.totalComments) || 0),
+          });
+          if (ghStats.stories && typeof ghStats.stories === 'object') {
+            for (const [sId, st] of Object.entries(ghStats.stories as Record<string, any>)) {
+              const current = cachedStoryStatsMap.get(sId) || {
+                views: 0,
+                likes: 0,
+                followers: 0,
+                ratingSum: 0,
+                ratingCount: 0,
+                commentCount: 0,
+              };
+              notifyStoryStatsSubscribers(sId, {
+                ...current,
+                views: Math.max(current.views, Number(st.views) || 0),
+                likes: Math.max(current.likes, Number(st.likes) || 0),
+              });
+            }
+          }
         }
       })
       .catch(() => {});
-  }
+  };
 
-  // 2b. Pull freshest stats.json from GitHub as reliable cloud backup
-  fetchRawGithubJson<any>('stats.json')
-    .then((ghStats) => {
-      if (ghStats) {
-        const globalData = ghStats.global || ghStats;
-        notifyGlobalStatsSubscribers({
-          totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(globalData.totalVisits) || 1),
-          totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0),
-          totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(globalData.totalLikes) || 0),
-          totalComments: Math.max(cachedGlobalStats.totalComments, Number(globalData.totalComments) || 0),
-        });
-        if (ghStats.stories && typeof ghStats.stories === 'object') {
-          for (const [sId, st] of Object.entries(ghStats.stories as Record<string, any>)) {
-            const current = cachedStoryStatsMap.get(sId) || {
-              views: 0,
-              likes: 0,
-              followers: 0,
-              ratingSum: 0,
-              ratingCount: 0,
-              commentCount: 0,
-            };
-            notifyStoryStatsSubscribers(sId, {
-              ...current,
-              views: Math.max(current.views, Number(st.views) || 0),
-              likes: Math.max(current.likes, Number(st.likes) || 0),
-            });
-          }
-        }
-      }
-    })
-    .catch(() => {});
+  fetchGlobalStatsNow();
+  // Periodic refresh from Server Engine / GitHub every 15 seconds (quota-free)
+  const syncInterval = setInterval(fetchGlobalStatsNow, 15000);
 
-  // 3. Firestore snapshot with auto-reconnect on quota reset
+  // 3. Firestore live snapshot with auto-reconnect on quota reset
   let unsubFirestore: (() => void) | null = null;
   const startGlobalStatsFs = () => {
     if (unsubFirestore || !isFirestoreEnabled() || checkIsFirestoreBlocked()) return;
@@ -1490,16 +1502,20 @@ export const subscribeToGlobalStats = (
           if (docSnap.exists()) {
             const data = docSnap.data();
             notifyGlobalStatsSubscribers({
-              totalVisits: data.totalVisits ?? cachedGlobalStats.totalVisits,
-              totalFollowers: data.totalFollowers ?? cachedGlobalStats.totalFollowers,
-              totalComments: data.totalComments ?? cachedGlobalStats.totalComments,
-              totalLikes: data.totalLikes ?? cachedGlobalStats.totalLikes,
+              totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(data.totalVisits) || 1),
+              totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(data.totalFollowers) || 0),
+              totalComments: Math.max(cachedGlobalStats.totalComments, Number(data.totalComments) || 0),
+              totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(data.totalLikes) || 0),
             });
           }
         },
-        () => {}
+        (err) => {
+          flagFirestoreQuotaExceeded(err);
+        }
       );
-    } catch {}
+    } catch (err) {
+      flagFirestoreQuotaExceeded(err);
+    }
   };
 
   startGlobalStatsFs();
@@ -1509,6 +1525,7 @@ export const subscribeToGlobalStats = (
 
   return () => {
     globalStatsListeners.delete(callback);
+    clearInterval(syncInterval);
     unsubReset();
     if (unsubFirestore) unsubFirestore();
   };
@@ -1516,7 +1533,7 @@ export const subscribeToGlobalStats = (
 
 /**
  * Subscribe to realtime stats for a specific story (views, likes, followers, ratings).
- * Baseline is strictly 0. Handled 100% by Server Engine with SSE real-time updates.
+ * Baseline is strictly 0. Synchronized with Firestore and Server Engine.
  */
 export const subscribeToStoryStats = (
   storyId: string,
@@ -1540,25 +1557,32 @@ export const subscribeToStoryStats = (
   }
   activeStoryStatsSubscribers.get(storyId)!.add(callback);
 
-  // 1. Fetch latest stats from Server Engine
-  if (hasBackendServer()) {
-    safeApiFetch(`/api/stories/${encodeURIComponent(storyId)}/stats`)
-      .then((res) => (res && res.ok ? res.json() : null))
-      .then((stats) => {
-        if (stats) {
-          notifyStoryStatsSubscribers(storyId, {
-            ...stats,
-            views: Math.max(stats.views || 0, initialData.views),
-            likes: Math.max(stats.likes || 0, initialData.likes),
-          });
-        }
-      })
-      .catch(() => {});
-  }
+  const fetchStoryStatsNow = () => {
+    // 1. Fetch latest stats from Server Engine
+    if (hasBackendServer()) {
+      safeApiFetch(`/api/stories/${encodeURIComponent(storyId)}/stats`)
+        .then((res) => (res && res.ok ? res.json() : null))
+        .then((stats) => {
+          if (stats) {
+            notifyStoryStatsSubscribers(storyId, {
+              ...stats,
+              views: Math.max(stats.views || 0, initialData.views),
+              likes: Math.max(stats.likes || 0, initialData.likes),
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  };
 
-  // 2. Firestore cloud sync only if explicitly enabled
+  fetchStoryStatsNow();
+  // Periodic poll from server every 12 seconds
+  const pollTimer = setInterval(fetchStoryStatsNow, 12000);
+
+  // 2. Firestore cloud sync with auto-reconnect
   let unsubFirestore: (() => void) | null = null;
-  if (!checkIsFirestoreBlocked()) {
+  const startStoryStatsFs = () => {
+    if (unsubFirestore || !isFirestoreEnabled() || checkIsFirestoreBlocked()) return;
     try {
       const storyDocRef = doc(db, 'story_stats', storyId);
       unsubFirestore = onSnapshot(
@@ -1567,32 +1591,44 @@ export const subscribeToStoryStats = (
           if (docSnap.exists()) {
             const data = docSnap.data();
             const stats: StoryRealtimeStats = {
-              views: data.views !== undefined ? Number(data.views) : (initialData.views || 0),
-              likes: data.likes !== undefined ? Number(data.likes) : (initialData.likes || 0),
-              followers: data.followers ?? 0,
-              ratingSum: data.ratingSum ?? 0,
-              ratingCount: data.ratingCount ?? 0,
-              commentCount: data.commentCount ?? 0,
+              views: Math.max(initialData.views, data.views !== undefined ? Number(data.views) : 0),
+              likes: Math.max(initialData.likes, data.likes !== undefined ? Number(data.likes) : 0),
+              followers: Number(data.followers) || 0,
+              ratingSum: Number(data.ratingSum) || 0,
+              ratingCount: Number(data.ratingCount) || 0,
+              commentCount: Number(data.commentCount) || 0,
             };
             notifyStoryStatsSubscribers(storyId, stats);
           }
         },
-        () => {}
+        (err) => {
+          flagFirestoreQuotaExceeded(err);
+        }
       );
-    } catch {}
-  }
+    } catch (err) {
+      flagFirestoreQuotaExceeded(err);
+    }
+  };
+
+  startStoryStatsFs();
+  const unsubReset = onFirestoreQuotaReset(() => {
+    startStoryStatsFs();
+  });
 
   return () => {
     const set = activeStoryStatsSubscribers.get(storyId);
     if (set) {
       set.delete(callback);
     }
+    clearInterval(pollTimer);
+    unsubReset();
     if (unsubFirestore) unsubFirestore();
   };
 };
 
 /**
  * Increment story views when a reader views the story details or chapters.
+ * Uses atomic Firestore setDoc merge with increment(1) to avoid redundant getDoc reads.
  */
 export const recordStoryView = async (storyId: string): Promise<void> => {
   try {
@@ -1622,30 +1658,23 @@ export const recordStoryView = async (storyId: string): Promise<void> => {
       }).catch(() => {});
     }
 
-    // 2. Firestore fallback if enabled
-    if (!checkIsFirestoreBlocked()) {
+    // 2. Firestore atomic merge increment (zero read cost)
+    if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
       const storyDocRef = doc(db, 'story_stats', storyId);
-      const snap = await getDoc(storyDocRef);
-      if (!snap.exists()) {
-        await setDoc(storyDocRef, {
+      setDoc(
+        storyDocRef,
+        {
           storyId,
-          views: 1,
-          likes: 0,
-          followers: 0,
-          ratingSum: 0,
-          ratingCount: 0,
-          commentCount: 0,
-          updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      } else {
-        await updateDoc(storyDocRef, {
           views: increment(1),
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
     }
   } catch (err) {
-    flagFirestoreQuotaExceeded(err);
+    console.warn('Realtime story view error:', err);
   }
 };
 
@@ -1663,33 +1692,32 @@ export const toggleStoryLike = async (storyId: string, isLiking: boolean): Promi
     }).catch(() => {});
   }
 
-  // 2. Firestore fallback if enabled
-  if (!checkIsFirestoreBlocked()) {
+  // 2. Firestore atomic merge increment
+  if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
     try {
       const storyDocRef = doc(db, 'story_stats', storyId);
-      const snap = await getDoc(storyDocRef);
-      if (!snap.exists()) {
-        await setDoc(storyDocRef, {
+      setDoc(
+        storyDocRef,
+        {
           storyId,
-          views: 1,
-          likes: Math.max(0, delta),
-          followers: 0,
-          ratingSum: 0,
-          ratingCount: 0,
-          commentCount: 0,
-          updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      } else {
-        await updateDoc(storyDocRef, {
           likes: increment(delta),
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
 
       const globalDocRef = doc(db, 'site_stats', STATS_DOC_ID);
-      await updateDoc(globalDocRef, {
-        totalLikes: increment(delta),
-      }).catch(() => {});
+      setDoc(
+        globalDocRef,
+        {
+          totalLikes: increment(delta),
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
     } catch (err) {
       flagFirestoreQuotaExceeded(err);
     }
@@ -1710,33 +1738,32 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
     }).catch(() => {});
   }
 
-  // 2. Firestore fallback if enabled
-  if (!checkIsFirestoreBlocked()) {
+  // 2. Firestore atomic merge increment
+  if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
     try {
       const storyDocRef = doc(db, 'story_stats', storyId);
-      const snap = await getDoc(storyDocRef);
-      if (!snap.exists()) {
-        await setDoc(storyDocRef, {
+      setDoc(
+        storyDocRef,
+        {
           storyId,
-          views: 1,
-          likes: 0,
-          followers: Math.max(0, delta),
-          ratingSum: 0,
-          ratingCount: 0,
-          commentCount: 0,
-          updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      } else {
-        await updateDoc(storyDocRef, {
           followers: increment(delta),
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
 
       const globalDocRef = doc(db, 'site_stats', STATS_DOC_ID);
-      await updateDoc(globalDocRef, {
-        totalFollowers: increment(delta),
-      }).catch(() => {});
+      setDoc(
+        globalDocRef,
+        {
+          totalFollowers: increment(delta),
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
     } catch (err) {
       flagFirestoreQuotaExceeded(err);
     }
@@ -1756,29 +1783,22 @@ export const submitStoryRating = async (storyId: string, stars: number): Promise
     }).catch(() => {});
   }
 
-  // 2. Firestore fallback if enabled
-  if (!checkIsFirestoreBlocked()) {
+  // 2. Firestore atomic merge increment
+  if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
     try {
       const storyDocRef = doc(db, 'story_stats', storyId);
-      const snap = await getDoc(storyDocRef);
-      if (!snap.exists()) {
-        await setDoc(storyDocRef, {
+      setDoc(
+        storyDocRef,
+        {
           storyId,
-          views: 1,
-          likes: 0,
-          followers: 0,
-          ratingSum: stars,
-          ratingCount: 1,
-          commentCount: 0,
-          updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      } else {
-        await updateDoc(storyDocRef, {
           ratingSum: increment(stars),
           ratingCount: increment(1),
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }
+        },
+        { merge: true }
+      ).catch((err) => {
+        flagFirestoreQuotaExceeded(err);
+      });
     } catch (err) {
       flagFirestoreQuotaExceeded(err);
     }
