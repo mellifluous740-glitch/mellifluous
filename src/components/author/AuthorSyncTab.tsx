@@ -47,6 +47,7 @@ import {
   isFirestoreEnabled,
   setFirestoreEnabled,
   resetFirestoreQuotaExhaustion,
+  resolvedFirebaseConfig,
 } from '../../lib/firebase';
 import { getApiBaseUrl, buildApiUrl, hasBackendServer, isStaticHosting, saveCustomBackendUrl } from '../../lib/apiConfig';
 import { Story, Chapter, Announcement } from '../../types';
@@ -136,23 +137,29 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
 
   // Test Server connection on mount or when customBackendUrl changes
   useEffect(() => {
+    let isMounted = true;
     const checkServer = async () => {
       if (!hasBackendServer()) {
-        setServerStatus('disconnected');
+        if (isMounted) setServerStatus('disconnected');
         return;
       }
       try {
-        const res = await fetch(buildApiUrl('/api/health'), { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(buildApiUrl('/api/health'), { signal: AbortSignal.timeout(3500) });
         if (res.ok) {
-          setServerStatus('connected');
+          if (isMounted) setServerStatus('connected');
         } else {
-          setServerStatus('disconnected');
+          if (isMounted) setServerStatus('disconnected');
         }
       } catch {
-        setServerStatus('disconnected');
+        if (isMounted) setServerStatus('disconnected');
       }
     };
     checkServer();
+    const interval = setInterval(checkServer, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [customBackendUrl]);
 
   // Save Custom Backend URL handler
@@ -417,10 +424,16 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
                 className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                   serverStatus === 'connected'
                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    : isStaticHosting()
+                    ? 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
                     : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
                 }`}
               >
-                {serverStatus === 'connected' ? 'Đang hoạt động (Ưu tiên)' : 'Đang kết nối lại'}
+                {serverStatus === 'connected'
+                  ? 'Đang hoạt động (Ưu tiên)'
+                  : isStaticHosting()
+                  ? 'Chế độ Tĩnh (GitHub CDN & Firestore)'
+                  : 'Đang kết nối lại'}
               </span>
             </div>
             <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
@@ -454,8 +467,8 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
               </span>
             </div>
             <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-              Dự án: <code className="text-amber-600 dark:text-amber-400 font-mono text-[10px]">gen-lang-client-0187202886</code><br />
-              Cơ sở dữ liệu: <code className="text-amber-600 dark:text-amber-400 font-mono text-[10px]">ai-studio-thegioicuaem...</code>
+              Dự án: <code className="text-amber-600 dark:text-amber-400 font-mono text-[10px]">{resolvedFirebaseConfig.projectId || 'mellifluous-07'}</code><br />
+              Cơ sở dữ liệu: <code className="text-amber-600 dark:text-amber-400 font-mono text-[10px]">{resolvedFirebaseConfig.firestoreDatabaseId || '(default)'}</code>
             </p>
             <p className="text-[11px] text-stone-500 dark:text-stone-400">
               Gói Spark miễn phí có hạn mức 50.000 đọc / 20.000 ghi mỗi ngày. Khi vượt hạn mức, blog tự động chuyển sang chế độ Local & Server an toàn mà không làm mất dữ liệu.
@@ -501,7 +514,7 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
               </button>
             </div>
             <a
-              href="https://console.firebase.google.com/project/gen-lang-client-0187202886/firestore/databases/ai-studio-thegioicuaem-b7c7b641-4999-40b9-94b5-153b75e5cc27/data?openUpgradeDialog=true"
+              href={`https://console.firebase.google.com/project/${resolvedFirebaseConfig.projectId || 'mellifluous-07'}/firestore/databases/${resolvedFirebaseConfig.firestoreDatabaseId || '(default)'}/data`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-amber-600 hover:underline inline-flex items-center gap-0.5 font-medium"

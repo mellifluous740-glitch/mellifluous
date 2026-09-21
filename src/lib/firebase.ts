@@ -50,7 +50,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support both environment variables (for GitHub Pages / Vercel / external hosting) and direct config
 const env = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
-const resolvedFirebaseConfig = {
+export const resolvedFirebaseConfig = {
   projectId: env.VITE_FIREBASE_PROJECT_ID || firebaseConfig?.projectId,
   appId: env.VITE_FIREBASE_APP_ID || firebaseConfig?.appId,
   apiKey: env.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey,
