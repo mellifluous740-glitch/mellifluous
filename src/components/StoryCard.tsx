@@ -258,7 +258,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
                 {formatDateOnly(story.publishedAt)}
               </span>
             ) : null}
-            )}
           </div>
 
           <div className="flex items-center gap-2">
