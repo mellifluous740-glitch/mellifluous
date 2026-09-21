@@ -1,7 +1,61 @@
 {
-  "totalVisits": 1,
-  "activeReaders": 1,
+  "totalVisits": 11,
   "totalFollowers": 0,
-  "totalComments": 0,
-  "totalLikes": 0
+  "totalLikes": 0,
+  "totalComments": 3,
+  "global": {
+    "totalVisits": 11,
+    "totalFollowers": 0,
+    "totalLikes": 0
+  },
+  "stories": {
+    "chanh-xanh-cuong-tuong": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "nang-luc-cua-man-em": {
+      "views": 1,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "vu-ly-thanh": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "tung-thanh": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "toi-co-khach-quy": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "khac-ten-anh-len-bia-mo-cua-em": {
+      "views": 9,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    }
+  }
 }
