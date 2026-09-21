@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/authContext';
+import firebaseConfig from '../../firebase-applet-config.json';
 import {
   X,
   Sparkles,
@@ -53,7 +54,7 @@ export const AuthModal: React.FC = () => {
     if (gWindow?.accounts?.id && signInWithGoogleCredential) {
       try {
         gWindow.accounts.id.initialize({
-          client_id: '257512102938-jta39nr86rpv0mrg6kkehvvig5ms5d2k.apps.googleusercontent.com',
+          client_id: firebaseConfig?.oAuthClientId || '776140461058-f2rgo07rmd55ag0q7mfb5dhigturu5kf.apps.googleusercontent.com',
           callback: async (res: any) => {
             if (res?.credential) {
               setIsLoading(true);
