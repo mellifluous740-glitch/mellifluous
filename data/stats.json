@@ -1,20 +1,20 @@
 {
   "totalVisits": 15,
-  "totalFollowers": 0,
-  "totalLikes": 0,
+  "totalFollowers": 1,
+  "totalLikes": 1,
   "totalComments": 3,
   "global": {
     "totalVisits": 15,
-    "totalFollowers": 0,
-    "totalLikes": 0
+    "totalFollowers": 1,
+    "totalLikes": 1
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
-      "views": 0,
-      "likes": 0,
-      "followers": 0,
-      "ratingSum": 0,
-      "ratingCount": 0,
+      "views": 1,
+      "likes": 1,
+      "followers": 1,
+      "ratingSum": 5,
+      "ratingCount": 1,
       "commentCount": 0
     },
     "nang-luc-cua-man-em": {
