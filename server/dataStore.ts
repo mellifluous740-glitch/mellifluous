@@ -532,9 +532,11 @@ export const getStoryById = (id: string): Story | undefined => {
 };
 
 export const saveStory = (story: Story): Story => {
+  const nowIso = new Date().toISOString();
   const storyWithTime: Story = {
     ...story,
-    updatedAt: story.updatedAt || new Date().toISOString(),
+    publishedAt: story.publishedAt || nowIso,
+    updatedAt: (story.updatedAt && story.updatedAt !== 'Vừa đăng' && story.updatedAt !== 'Vừa cập nhật') ? story.updatedAt : nowIso,
   };
   const filtered = cachedStories.filter((s) => s.id !== story.id);
   cachedStories = sortStoriesByLatest([storyWithTime, ...filtered]);
