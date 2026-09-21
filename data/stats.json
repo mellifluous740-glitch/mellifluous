@@ -70,7 +70,8 @@
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
-      "ratingCount": 0
+      "ratingCount": 0,
+      "commentCount": 0
     }
   }
 }
