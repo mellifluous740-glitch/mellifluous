@@ -1,13 +1,73 @@
 {
+  "totalVisits": 22,
+  "totalFollowers": 1,
+  "totalLikes": 4,
+  "totalComments": 3,
   "global": {
-    "totalVisits": 3,
-    "totalFollowers": 0,
-    "totalLikes": 1
+    "totalVisits": 22,
+    "totalFollowers": 1,
+    "totalLikes": 4
   },
   "stories": {
-    "1": {
+    "chanh-xanh-cuong-tuong": {
       "views": 1,
       "likes": 1,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "nang-luc-cua-man-em": {
+      "views": 5,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "vu-ly-thanh": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "tung-thanh": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "toi-co-khach-quy": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "khac-ten-anh-len-bia-mo-cua-em": {
+      "views": 9,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "huong-dan-lang-phi-tinh-yeu": {
+      "views": 1,
+      "likes": 3,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
+    },
+    "chao-em-co-gai-yeu-mau-trang": {
+      "views": 0,
+      "likes": 0,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0

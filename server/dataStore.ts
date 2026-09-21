@@ -929,13 +929,18 @@ const loadStats = () => {
       const loaded = readJsonSafe<any>(STATS_FILE, null);
       if (loaded) {
         const globalData = loaded.global || loaded;
+        const storiesMap = loaded.stories && typeof loaded.stories === 'object' ? loaded.stories : {};
+        const aggregateStoryLikes = cachedStories.reduce((acc, s) => {
+          const sLikes = storiesMap[s.id]?.likes !== undefined ? storiesMap[s.id].likes : (s.likes || 0);
+          return acc + (Number(sLikes) || 0);
+        }, 0);
         cachedStats = {
           global: {
             totalVisits: Math.max(1, Number(globalData.totalVisits) || Number(loaded.totalVisits) || 1),
             totalFollowers: Math.max(0, Number(globalData.totalFollowers) || Number(loaded.totalFollowers) || 0),
-            totalLikes: Math.max(0, Number(globalData.totalLikes) || Number(loaded.totalLikes) || 0),
+            totalLikes: Math.max(Number(globalData.totalLikes) || 0, aggregateStoryLikes),
           },
-          stories: loaded.stories && typeof loaded.stories === 'object' ? loaded.stories : {},
+          stories: storiesMap,
         };
         return;
       }
@@ -967,9 +972,13 @@ export const getGlobalStats = (liveActiveCount?: number) => {
   reloadCommentsIfChanged();
   reloadStatsIfChanged();
   
-  // Calculate sum of likes across all stories as floor for total likes
-  const aggregateStoryLikes = cachedStories.reduce((acc, s) => acc + (Number(s.likes) || 0), 0);
+  // Calculate sum of likes across all stories as dynamic floor for total likes
+  const aggregateStoryLikes = cachedStories.reduce((acc, s) => {
+    const sLikes = cachedStats.stories[s.id]?.likes !== undefined ? cachedStats.stories[s.id].likes : (s.likes || 0);
+    return acc + (Number(sLikes) || 0);
+  }, 0);
   const effectiveTotalLikes = Math.max(cachedStats.global.totalLikes || 0, aggregateStoryLikes);
+  cachedStats.global.totalLikes = effectiveTotalLikes;
 
   return {
     totalVisits: Math.max(1, cachedStats.global.totalVisits || 1),
@@ -1047,13 +1056,18 @@ export const toggleStoryLike = (storyId: string, delta: number) => {
       ratingCount: 0,
     };
   }
-  cachedStats.stories[storyId].likes = Math.max(0, (cachedStats.stories[storyId].likes || 0) + delta);
-  cachedStats.global.totalLikes = Math.max(0, (cachedStats.global.totalLikes || 0) + delta);
+  const currentLikes = Math.max(cachedStats.stories[storyId].likes || 0, story?.likes || 0);
+  cachedStats.stories[storyId].likes = Math.max(0, currentLikes + delta);
   const sIdx = cachedStories.findIndex((s) => s.id === storyId);
   if (sIdx >= 0) {
     cachedStories[sIdx].likes = cachedStats.stories[storyId].likes;
     writeJsonSafe(STORIES_FILE, cachedStories);
   }
+  const aggregateStoryLikes = cachedStories.reduce((acc, s) => {
+    const sLikes = cachedStats.stories[s.id]?.likes !== undefined ? cachedStats.stories[s.id].likes : (s.likes || 0);
+    return acc + (Number(sLikes) || 0);
+  }, 0);
+  cachedStats.global.totalLikes = Math.max(aggregateStoryLikes, (cachedStats.global.totalLikes || 0) + delta);
   persistStatsSafe();
   return getStoryStats(storyId);
 };

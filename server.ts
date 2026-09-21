@@ -93,8 +93,7 @@ export const getLiveActiveReadersCount = (): number => {
       activePresences.delete(id);
     }
   }
-  // Total unique active readers: unique heartbeat visitors + any unique SSE clients
-  return Math.max(1, activePresences.size, sseClients.length);
+  return Math.max(1, activePresences.size);
 };
 
 let lastBroadcastActiveCount = 1;
@@ -254,7 +253,8 @@ app.get('/api/events', (req: Request, res: Response) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
-  const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  const visitorIdParam = req.query.visitorId ? String(req.query.visitorId) : null;
+  const clientId = visitorIdParam || `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const newClient: SSEClient = { id: clientId, res };
   sseClients.push(newClient);
   activePresences.set(clientId, Date.now());

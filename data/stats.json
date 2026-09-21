@@ -1,12 +1,12 @@
 {
-  "totalVisits": 21,
+  "totalVisits": 22,
   "totalFollowers": 1,
-  "totalLikes": 1,
+  "totalLikes": 4,
   "totalComments": 3,
   "global": {
-    "totalVisits": 21,
+    "totalVisits": 22,
     "totalFollowers": 1,
-    "totalLikes": 1
+    "totalLikes": 4
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
@@ -59,11 +59,18 @@
     },
     "huong-dan-lang-phi-tinh-yeu": {
       "views": 1,
-      "likes": 0,
+      "likes": 3,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
+    },
+    "chao-em-co-gai-yeu-mau-trang": {
+      "views": 0,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0
     }
   }
 }

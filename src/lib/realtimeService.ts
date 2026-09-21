@@ -301,6 +301,32 @@ export const getStoredAllStoryStats = (): Record<string, StoryRealtimeStats> => 
   return result;
 };
 
+export const calculateAggregateStoryLikes = (): number => {
+  let sum = 0;
+  try {
+    const stories = getStoredStories();
+    const allStats = getStoredAllStoryStats();
+    const seenIds = new Set<string>();
+
+    if (Array.isArray(stories)) {
+      stories.forEach((s) => {
+        if (!s || !s.id || isStoryDeleted(s.id)) return;
+        seenIds.add(s.id);
+        const statLikes = allStats[s.id]?.likes !== undefined ? allStats[s.id].likes : (cachedStoryStatsMap.get(s.id)?.likes ?? s.likes);
+        sum += Math.max(0, Number(statLikes) || 0);
+      });
+    }
+
+    cachedStoryStatsMap.forEach((stats, id) => {
+      if (!seenIds.has(id) && !isStoryDeleted(id)) {
+        sum += Math.max(0, Number(stats.likes) || 0);
+      }
+    });
+  } catch {}
+
+  return sum;
+};
+
 export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtimeStats) => {
   cachedStoryStatsMap.set(storyId, { ...stats });
   if (typeof window !== 'undefined') {
@@ -320,6 +346,11 @@ export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtim
       }
     });
   }
+  // Automatically recalculate aggregate likes across all stories and notify global stats
+  const aggLikes = calculateAggregateStoryLikes();
+  notifyGlobalStatsSubscribers({
+    totalLikes: Math.max(cachedGlobalStats.totalLikes, aggLikes),
+  });
 };
 
 // Active readers presence registry & subscribers
@@ -337,7 +368,7 @@ export const updateLiveActiveReaders = (count: number) => {
   });
   globalStatsListeners.forEach((cb) => {
     try {
-      cb({ ...cachedGlobalStats });
+      cb({ ...cachedGlobalStats, activeReaders: validCount });
     } catch {}
   });
 };
@@ -363,17 +394,24 @@ let cachedGlobalStats: GlobalRealtimeStats = {
   activeReaders: 1,
   totalFollowers: Number(defaultFollowers),
   totalComments: Array.isArray(defaultCommentsJson) ? defaultCommentsJson.length : 0,
-  totalLikes: Number(defaultLikes),
+  totalLikes: Math.max(Number(defaultLikes), calculateAggregateStoryLikes()),
 };
 
 export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStats>) => {
   const safeActive =
     partial.activeReaders !== undefined
-      ? Math.max(1, partial.activeReaders, currentLiveActiveReaders)
+      ? Math.max(1, partial.activeReaders)
       : Math.max(1, currentLiveActiveReaders);
+  currentLiveActiveReaders = safeActive;
+
+  const aggLikes = calculateAggregateStoryLikes();
+  const rawLikes = partial.totalLikes !== undefined ? Number(partial.totalLikes) : (cachedGlobalStats.totalLikes || 0);
+  const effectiveLikes = Math.max(rawLikes, aggLikes);
+
   cachedGlobalStats = {
     ...cachedGlobalStats,
     ...partial,
+    totalLikes: effectiveLikes,
     activeReaders: safeActive,
   };
   if (typeof window !== 'undefined' && cachedGlobalStats.totalVisits) {
@@ -390,7 +428,11 @@ export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStat
   });
 };
 
-export const getGlobalStats = (): GlobalRealtimeStats => ({ ...cachedGlobalStats });
+export const getGlobalStats = (): GlobalRealtimeStats => {
+  const aggLikes = calculateAggregateStoryLikes();
+  cachedGlobalStats.totalLikes = Math.max(cachedGlobalStats.totalLikes || 0, aggLikes);
+  return { ...cachedGlobalStats };
+};
 
 const notifyStorySubscribers = (stories: Story[]) => {
   const clean = stories.filter((s) => !isStoryDeleted(s.id));
@@ -943,7 +985,8 @@ export const initServerRealtimeSync = () => {
 
   // 2. Real-time Server-Sent Events (SSE)
   try {
-    const eventSource = new EventSource(buildApiUrl('/api/events'));
+    const sseVisitorId = getSessionVisitorId();
+    const eventSource = new EventSource(buildApiUrl(`/api/events?visitorId=${encodeURIComponent(sseVisitorId)}`));
     eventSource.onmessage = (e) => {
       try {
         if (!e.data || e.data.startsWith(':')) return;
@@ -1284,20 +1327,61 @@ export const recordSiteVisit = async (): Promise<void> => {
   }
 };
 
+// Cross-tab local presence mesh
+const localPresenceTabs = new Map<string, number>();
+const tabInstanceId = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+let localPresenceChannel: BroadcastChannel | null = null;
+
+const getLocalActiveTabsCount = (): number => {
+  const now = Date.now();
+  const threshold = now - 45000;
+  for (const [id, seen] of localPresenceTabs.entries()) {
+    if (seen < threshold) localPresenceTabs.delete(id);
+  }
+  return localPresenceTabs.size + 1;
+};
+
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    localPresenceChannel = new BroadcastChannel('mel_reader_presence_mesh');
+    localPresenceChannel.onmessage = (e) => {
+      const { type, tabId } = e.data || {};
+      if (type === 'tab_heartbeat' && tabId && tabId !== tabInstanceId) {
+        localPresenceTabs.set(tabId, Date.now());
+        if (!hasBackendServer()) {
+          updateLiveActiveReaders(Math.max(1, getLocalActiveTabsCount()));
+        }
+      } else if (type === 'tab_leave' && tabId) {
+        localPresenceTabs.delete(tabId);
+        if (!hasBackendServer()) {
+          updateLiveActiveReaders(Math.max(1, getLocalActiveTabsCount()));
+        }
+      }
+    };
+  } catch {}
+}
+
 /**
  * Realtime Presence Heartbeat: Keeps track of actual active readers online right now.
- * Dual-backed: Server Engine HTTP heartbeats + Firestore reader_presences for multi-instance distributed sync.
+ * Dual-backed: Server Engine HTTP heartbeats + Firestore live_presence + local tab mesh.
  */
 export const startActiveReaderHeartbeat = (onCountChange: (count: number) => void): (() => void) => {
   activeReaderSubscribers.add(onCountChange);
   // Send current cached active count immediately
-  onCountChange(Math.max(1, currentLiveActiveReaders));
+  onCountChange(Math.max(1, currentLiveActiveReaders, getLocalActiveTabsCount()));
 
   const visitorId = getSessionVisitorId();
 
   // 1. Send heartbeat to Server Engine & Firestore
   const sendHeartbeat = () => {
-    // A. Backend Server Heartbeat
+    // A. Local multi-tab mesh heartbeat
+    if (localPresenceChannel) {
+      try {
+        localPresenceChannel.postMessage({ type: 'tab_heartbeat', tabId: tabInstanceId });
+      } catch {}
+    }
+
+    // B. Backend Server Heartbeat
     if (hasBackendServer()) {
       safeApiFetch('/api/presence/heartbeat', {
         method: 'POST',
@@ -1313,15 +1397,14 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
         .catch(() => {});
     }
 
-    // B. Firestore presence heartbeat
+    // C. Firestore presence heartbeat (compact single document, minimal write quota)
     if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
-      const presenceDocRef = doc(db, ACTIVE_PRESENCE_COLLECTION, visitorId);
+      const presenceDocRef = doc(db, 'site_stats', 'live_presence');
       setDoc(
         presenceDocRef,
         {
-          visitorId,
-          lastSeen: Date.now(),
-          updatedAt: new Date().toISOString(),
+          [visitorId]: Date.now(),
+          updatedAt: Date.now(),
         },
         { merge: true }
       ).catch((err) => {
@@ -1349,11 +1432,22 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
   // Gracefully notify leave when reader closes tab
   const handleLeave = () => {
     try {
+      if (localPresenceChannel) {
+        localPresenceChannel.postMessage({ type: 'tab_leave', tabId: tabInstanceId });
+      }
       if (hasBackendServer() && typeof navigator !== 'undefined' && navigator.sendBeacon) {
         navigator.sendBeacon(buildApiUrl('/api/presence/leave'), JSON.stringify({ visitorId }));
       }
       if (isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
-        deleteDoc(doc(db, ACTIVE_PRESENCE_COLLECTION, visitorId)).catch(() => {});
+        const presenceDocRef = doc(db, 'site_stats', 'live_presence');
+        setDoc(
+          presenceDocRef,
+          {
+            [visitorId]: 0,
+            updatedAt: Date.now(),
+          },
+          { merge: true }
+        ).catch(() => {});
       }
     } catch {}
   };
@@ -1364,38 +1458,42 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
 
   // 2. Initial check of active readers from server
   if (hasBackendServer()) {
-    fetchWithTimeout('/api/active-readers', {}, 2500)
-      .then((r) => r.json())
+    safeApiFetch('/api/active-readers')
+      .then((r) => (r && r.ok ? r.json() : null))
       .then((data) => {
         if (typeof data?.count === 'number') {
           updateLiveActiveReaders(data.count);
         }
       })
       .catch(() => {
-        onCountChange(Math.max(1, currentLiveActiveReaders));
+        onCountChange(Math.max(1, currentLiveActiveReaders, getLocalActiveTabsCount()));
       });
   }
 
-  // 3. Firestore snapshot for multi-device presence synchronization
+  // 3. Firestore snapshot for multi-device presence synchronization (single document: 1 read per update!)
   let unsubFirestorePresence: (() => void) | null = null;
   const startFsPresence = () => {
     if (unsubFirestorePresence || !isFirestoreEnabled() || checkIsFirestoreBlocked()) return;
     try {
-      const presencesCol = collection(db, ACTIVE_PRESENCE_COLLECTION);
+      const livePresenceDocRef = doc(db, 'site_stats', 'live_presence');
       unsubFirestorePresence = onSnapshot(
-        presencesCol,
-        (snapshot) => {
-          const now = Date.now();
-          const threshold = now - 55000; // 55 seconds active window
-          let firestoreActive = 0;
-          snapshot.docs.forEach((d) => {
-            const data = d.data();
-            if (data && typeof data.lastSeen === 'number' && data.lastSeen > threshold) {
-              firestoreActive++;
+        livePresenceDocRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() || {};
+            const now = Date.now();
+            const threshold = now - 50000;
+            let cloudCount = 0;
+            for (const [key, val] of Object.entries(data)) {
+              if (key !== 'updatedAt' && typeof val === 'number' && val > threshold) {
+                cloudCount++;
+              }
             }
-          });
-          if (firestoreActive > 0) {
-            updateLiveActiveReaders(Math.max(firestoreActive, currentLiveActiveReaders));
+            const localTabs = getLocalActiveTabsCount();
+            const effectiveCount = Math.max(1, cloudCount, localTabs);
+            if (!hasBackendServer()) {
+              updateLiveActiveReaders(effectiveCount);
+            }
           }
         },
         (err) => {
@@ -1437,6 +1535,8 @@ export const subscribeToGlobalStats = (
   callback: (stats: GlobalRealtimeStats) => void
 ): (() => void) => {
   // 1. Deliver current in-memory / cached stats immediately
+  const initialAggLikes = calculateAggregateStoryLikes();
+  cachedGlobalStats.totalLikes = Math.max(cachedGlobalStats.totalLikes || 0, initialAggLikes);
   callback({ ...cachedGlobalStats, activeReaders: Math.max(1, currentLiveActiveReaders) });
   globalStatsListeners.add(callback);
 
@@ -1458,10 +1558,11 @@ export const subscribeToGlobalStats = (
       .then((ghStats) => {
         if (ghStats) {
           const globalData = ghStats.global || ghStats;
+          const currentAgg = calculateAggregateStoryLikes();
           notifyGlobalStatsSubscribers({
             totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(globalData.totalVisits) || 1),
             totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0),
-            totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(globalData.totalLikes) || 0),
+            totalLikes: Math.max(Number(globalData.totalLikes) || 0, currentAgg),
             totalComments: Math.max(cachedGlobalStats.totalComments, Number(globalData.totalComments) || 0),
           });
           if (ghStats.stories && typeof ghStats.stories === 'object') {
@@ -1501,11 +1602,12 @@ export const subscribeToGlobalStats = (
         (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
+            const currentAgg = calculateAggregateStoryLikes();
             notifyGlobalStatsSubscribers({
               totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(data.totalVisits) || 1),
               totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(data.totalFollowers) || 0),
               totalComments: Math.max(cachedGlobalStats.totalComments, Number(data.totalComments) || 0),
-              totalLikes: Math.max(cachedGlobalStats.totalLikes, Number(data.totalLikes) || 0),
+              totalLikes: Math.max(Number(data.totalLikes) || 0, currentAgg),
             });
           }
         },
@@ -1683,13 +1785,52 @@ export const recordStoryView = async (storyId: string): Promise<void> => {
  */
 export const toggleStoryLike = async (storyId: string, isLiking: boolean): Promise<void> => {
   const delta = isLiking ? 1 : -1;
+
+  // 0. Immediate optimistic update locally
+  const currentStats = cachedStoryStatsMap.get(storyId) || {
+    views: 0,
+    likes: 0,
+    followers: 0,
+    ratingSum: 0,
+    ratingCount: 0,
+    commentCount: 0,
+  };
+  const updatedLikes = Math.max(0, (currentStats.likes || 0) + delta);
+  notifyStoryStatsSubscribers(storyId, {
+    ...currentStats,
+    likes: updatedLikes,
+  });
+
+  // Also update stored stories if present in localStorage
+  try {
+    const stories = getStoredStories();
+    const sIdx = stories.findIndex((s) => s.id === storyId);
+    if (sIdx >= 0) {
+      stories[sIdx].likes = updatedLikes;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mel_published_stories', JSON.stringify(stories));
+      }
+    }
+  } catch {}
+
   // 1. Server Engine
   if (hasBackendServer()) {
     safeApiFetch(`/api/stories/${encodeURIComponent(storyId)}/like`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ delta }),
-    }).catch(() => {});
+    })
+      .then((res) => (res && res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.likes === 'number') {
+          notifyStoryStatsSubscribers(storyId, {
+            ...currentStats,
+            likes: data.likes,
+            views: data.views ?? currentStats.views,
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   // 2. Firestore atomic merge increment

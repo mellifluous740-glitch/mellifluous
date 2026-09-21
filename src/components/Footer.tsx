@@ -30,8 +30,9 @@ export const Footer: React.FC = () => {
     // 3. Listen to live global stats changes from Firestore / Server Engine
     const unsubscribeStats = subscribeToGlobalStats((cloudStats) => {
       setStats((prev) => ({
+        ...prev,
         ...cloudStats,
-        activeReaders: Math.max(1, cloudStats.activeReaders || 1, prev.activeReaders || 1),
+        activeReaders: cloudStats.activeReaders ? Math.max(1, cloudStats.activeReaders) : prev.activeReaders,
       }));
       setIsLiveConnected(true);
     });
