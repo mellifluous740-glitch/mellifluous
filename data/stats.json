@@ -1,10 +1,10 @@
 {
-  "totalVisits": 22,
+  "totalVisits": 35,
   "totalFollowers": 1,
   "totalLikes": 4,
   "totalComments": 3,
   "global": {
-    "totalVisits": 22,
+    "totalVisits": 35,
     "totalFollowers": 1,
     "totalLikes": 4
   },
@@ -70,7 +70,9 @@
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
-      "ratingCount": 0
+      "ratingCount": 0,
+      "commentCount": 0
     }
-  }
+  },
+  "updatedAt": "2026-09-22T10:40:59.840Z"
 }
