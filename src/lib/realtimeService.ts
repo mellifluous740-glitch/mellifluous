@@ -222,17 +222,23 @@ export const mergeChapters = (base: Chapter[], incoming: Chapter[]): Chapter[] =
 
   const map = new Map<string, Chapter>();
 
+  const getCleanKey = (ch: Chapter) => {
+    const part = ch.partType || (ch.isExtra ? 'extra' : 'main');
+    const num = Number(ch.chapterNumber) || 0;
+    return `${ch.storyId || ''}-${part}-${num}`;
+  };
+
   // 1. Add all base chapters into map first
   base.forEach((ch) => {
     if (!ch || (ch as any).deleted) return;
-    const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
+    const key = getCleanKey(ch);
     map.set(key, ch);
   });
 
   // 2. Safely merge incoming chapters without dropping any base chapters!
   incoming.forEach((ch) => {
     if (!ch || (ch as any).deleted) return;
-    const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
+    const key = getCleanKey(ch);
     if (!map.has(key)) {
       map.set(key, ch);
     } else {
@@ -242,8 +248,13 @@ export const mergeChapters = (base: Chapter[], incoming: Chapter[]): Chapter[] =
       const incomingContentLen = (ch.content || '').length;
       const existingContentLen = (existing.content || '').length;
 
-      // Incoming takes precedence if newer timestamp, or if equal and content is longer
-      if (incomingTime > existingTime || (incomingTime === existingTime && incomingContentLen >= existingContentLen)) {
+      // Smart check: detect if existing has corrupted ID (e.g. ID ends with -c1 but chapterNumber is 9)
+      const isExistingCorrupted = existing.id?.endsWith('-c1') && Number(existing.chapterNumber) !== 1;
+      const isIncomingClean = ch.id?.endsWith(`-c${ch.chapterNumber}`) || Number(ch.chapterNumber) === 1;
+
+      if (isExistingCorrupted && isIncomingClean) {
+        map.set(key, ch);
+      } else if (incomingTime > existingTime || (incomingTime === existingTime && incomingContentLen >= existingContentLen)) {
         map.set(key, { ...existing, ...ch });
       } else if (incomingContentLen > existingContentLen) {
         map.set(key, { ...existing, ...ch, content: ch.content });

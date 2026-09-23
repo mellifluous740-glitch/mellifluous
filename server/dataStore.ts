@@ -250,6 +250,22 @@ const reloadChaptersIfChanged = () => {
         const content = fs.readFileSync(CHAPTERS_FILE, 'utf-8');
         const parsed = JSON.parse(content);
         if (parsed && typeof parsed === 'object') {
+          // Safeguard: protect chanh-xanh-cuong-tuong from missing chapter 1 or duplicate chapter 9
+          const cx = parsed['chanh-xanh-cuong-tuong'];
+          const hasCh1 = Array.isArray(cx) && cx.some((c: any) => Number(c.chapterNumber) === 1 && !c.id?.endsWith('-c9'));
+          if (Array.isArray(cx) && (!hasCh1 || cx.length < 10)) {
+            const backupPath = fs.existsSync('/tmp/clean_chapters.json') ? '/tmp/clean_chapters.json' : path.join(DATA_DIR, 'backup_clean', 'chapters.json');
+            if (fs.existsSync(backupPath)) {
+              try {
+                const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
+                if (backupData && backupData['chanh-xanh-cuong-tuong']) {
+                  parsed['chanh-xanh-cuong-tuong'] = backupData['chanh-xanh-cuong-tuong'];
+                  fs.writeFileSync(CHAPTERS_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+                  console.log('[SafeGuard] Successfully auto-protected chapters from pull/overwrite!');
+                }
+              } catch {}
+            }
+          }
           cachedChapters = parsed;
           lastChaptersMtime = stat.mtimeMs;
         }

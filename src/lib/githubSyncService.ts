@@ -442,15 +442,21 @@ export async function commitGithubDataFile(
                 mergedChapters[storyId] = localList;
               } else {
                 const chMap = new Map<string, Chapter>();
+                const getChapterKey = (c: Chapter) => {
+                  const part = c.partType || (c.isExtra ? 'extra' : 'main');
+                  const num = Number(c.chapterNumber) || 0;
+                  return `${part}-${num}`;
+                };
+
                 remoteList.forEach((c) => {
                   if (c && !(c as any).deleted && !isChapterDeleted(c.id)) {
-                    const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                    const k = getChapterKey(c);
                     chMap.set(k, c);
                   }
                 });
                 localList.forEach((c) => {
                   if (c && !(c as any).deleted && !isChapterDeleted(c.id)) {
-                    const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                    const k = getChapterKey(c);
                     chMap.set(k, c);
                   }
                 });
