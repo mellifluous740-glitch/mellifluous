@@ -1,17 +1,17 @@
 {
-  "totalVisits": 64,
-  "totalFollowers": 3,
-  "totalLikes": 7,
+  "totalVisits": 72,
+  "totalFollowers": 4,
+  "totalLikes": 8,
   "totalComments": 3,
   "global": {
-    "totalVisits": 64,
-    "totalLikes": 7,
-    "totalFollowers": 3
+    "totalVisits": 72,
+    "totalFollowers": 4,
+    "totalLikes": 8
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
       "views": 17,
-      "likes": 2,
+      "likes": 3,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
@@ -58,7 +58,7 @@
       "commentCount": 0
     },
     "huong-dan-lang-phi-tinh-yeu": {
-      "views": 12,
+      "views": 13,
       "likes": 4,
       "followers": 0,
       "ratingSum": 0,
@@ -73,5 +73,6 @@
       "ratingCount": 0,
       "commentCount": 0
     }
-  }
+  },
+  "updatedAt": "2026-09-23T16:40:08.579Z"
 }
