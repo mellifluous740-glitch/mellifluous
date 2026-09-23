@@ -41,8 +41,9 @@ import {
   getLiveChaptersRuntimeCache,
   getStoryChapters,
   isAnnouncementDeleted,
+  isStoryDeleted,
 } from '../../data/mockData';
-import { getStoredStories, getStoredAnnouncements, saveStoredAnnouncements, syncAllLocalToFirestore } from '../../lib/realtimeService';
+import { getStoredStories, getStoredAnnouncements, saveStoredAnnouncements, syncAllLocalToFirestore, mergeChapters } from '../../lib/realtimeService';
 import {
   isFirestoreEnabled,
   setFirestoreEnabled,
@@ -298,14 +299,40 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
 
       let updatedCount = 0;
       if (Array.isArray(remoteStories) && remoteStories.length > 0) {
-        localStorage.setItem('mel_published_stories', JSON.stringify(remoteStories));
-        updatedCount += remoteStories.length;
+        const localList = getStoredStories();
+        const mergedMap = new Map<string, Story>();
+        remoteStories.forEach((s) => {
+          if (s && s.id && !isStoryDeleted(s.id)) {
+            mergedMap.set(s.id, s);
+          }
+        });
+        localList.forEach((s) => {
+          if (s && s.id && !isStoryDeleted(s.id)) {
+            if (!mergedMap.has(s.id)) {
+              mergedMap.set(s.id, s);
+            } else {
+              const remoteS = mergedMap.get(s.id)!;
+              mergedMap.set(s.id, {
+                ...remoteS,
+                ...s,
+                views: Math.max(remoteS.views || 0, s.views || 0),
+                likes: Math.max(remoteS.likes || 0, s.likes || 0),
+                completedChapters: Math.max(remoteS.completedChapters || 0, s.completedChapters || 0),
+              });
+            }
+          }
+        });
+        const finalStories = Array.from(mergedMap.values());
+        localStorage.setItem('mel_published_stories', JSON.stringify(finalStories));
+        updatedCount = finalStories.length;
       }
 
       if (remoteChapters && typeof remoteChapters === 'object') {
-        for (const [storyId, chList] of Object.entries(remoteChapters)) {
-          if (Array.isArray(chList)) {
-            localStorage.setItem(`mel_chapters_${storyId}`, JSON.stringify(chList));
+        for (const [storyId, remoteList] of Object.entries(remoteChapters)) {
+          if (Array.isArray(remoteList)) {
+            const localList = getStoryChapters(storyId);
+            const merged = mergeChapters(remoteList, localList);
+            localStorage.setItem(`mel_chapters_${storyId}`, JSON.stringify(merged));
           }
         }
       }

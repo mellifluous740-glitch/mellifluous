@@ -5,6 +5,7 @@
  */
 
 import { Story, Chapter, Announcement, ReaderLetter } from '../types';
+import { isStoryDeleted } from '../data/mockData';
 
 export interface GithubConfig {
   repo: string; // e.g. "maianhpham927-glitch/mellifluous"
@@ -395,7 +396,76 @@ export async function commitGithubDataFile(
     };
 
     try {
-      const jsonString = JSON.stringify(content, null, 2);
+      // Smart resilient merge for stories.json & chapters.json:
+      // Guarantees that committing new stories/chapters NEVER drops or overwrites existing data on GitHub
+      let payloadContent = content;
+
+      if (filename === 'stories.json' && Array.isArray(content)) {
+        try {
+          const remoteStories = await fetchRawGithubJson<Story[]>('stories.json');
+          if (Array.isArray(remoteStories) && remoteStories.length > 0) {
+            const mergedMap = new Map<string, Story>();
+            // Remote stories: preserve any story that hasn't been explicitly deleted
+            remoteStories.forEach((s) => {
+              if (s && s.id && !isStoryDeleted(s.id)) {
+                mergedMap.set(s.id, s);
+              }
+            });
+            // Local content: apply updates and additions
+            content.forEach((s: Story) => {
+              if (s && s.id && !isStoryDeleted(s.id)) {
+                const existing = mergedMap.get(s.id);
+                mergedMap.set(s.id, {
+                  ...existing,
+                  ...s,
+                  views: Math.max(existing?.views || 0, s.views || 0),
+                  likes: Math.max(existing?.likes || 0, s.likes || 0),
+                  completedChapters: Math.max(existing?.completedChapters || 0, s.completedChapters || 0),
+                });
+              }
+            });
+            payloadContent = Array.from(mergedMap.values());
+          }
+        } catch (mergeErr) {
+          console.warn('[GitHubSync] Stories merge note:', mergeErr);
+        }
+      } else if (filename === 'chapters.json' && typeof content === 'object' && content !== null) {
+        try {
+          const remoteChapters = await fetchRawGithubJson<Record<string, Chapter[]>>('chapters.json');
+          if (remoteChapters && typeof remoteChapters === 'object') {
+            const mergedChapters: Record<string, Chapter[]> = { ...remoteChapters };
+            for (const [storyId, localList] of Object.entries(content as Record<string, Chapter[]>)) {
+              const remoteList = remoteChapters[storyId] || [];
+              if (!Array.isArray(localList) || localList.length === 0) {
+                mergedChapters[storyId] = remoteList;
+              } else if (!Array.isArray(remoteList) || remoteList.length === 0) {
+                mergedChapters[storyId] = localList;
+              } else {
+                const chMap = new Map<string, Chapter>();
+                remoteList.forEach((c) => {
+                  const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                  chMap.set(k, c);
+                });
+                localList.forEach((c) => {
+                  const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                  chMap.set(k, c);
+                });
+                mergedChapters[storyId] = Array.from(chMap.values()).sort((a, b) => {
+                  const numA = Number(a.chapterNumber) || 0;
+                  const numB = Number(b.chapterNumber) || 0;
+                  if (numA !== numB) return numA - numB;
+                  return (a.isExtra ? 1 : 0) - (b.isExtra ? 1 : 0);
+                });
+              }
+            }
+            payloadContent = mergedChapters;
+          }
+        } catch (mergeErr) {
+          console.warn('[GitHubSync] Chapters merge note:', mergeErr);
+        }
+      }
+
+      const jsonString = JSON.stringify(payloadContent, null, 2);
       const base64Content = utf8ToBase64(jsonString);
 
       const maxRetries = 4;
