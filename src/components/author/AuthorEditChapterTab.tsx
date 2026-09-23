@@ -14,6 +14,7 @@ import {
   Calendar,
   History,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { getStoryChapters } from '../../data/mockData';
 import { publishChapter, deleteChapter, subscribeToStoryChapters } from '../../lib/realtimeService';
@@ -190,6 +191,18 @@ export const AuthorEditChapterTab: React.FC<AuthorEditChapterTabProps> = ({
   const wordCount = chapterContent.trim() ? chapterContent.trim().split(/\s+/).filter(Boolean).length : 0;
   const estReadMinutes = Math.max(1, Math.ceil(wordCount / 220));
 
+  const duplicateCollisionChapter = useMemo(() => {
+    if (!selectedChapterId || !chapterNumber) return null;
+    return (
+      chapters.find(
+        (c) =>
+          c.id !== selectedChapterId &&
+          Number(c.chapterNumber) === Number(chapterNumber) &&
+          (c.partType || (c.isExtra ? 'extra' : 'main')) === partType
+      ) || null
+    );
+  }, [chapters, selectedChapterId, chapterNumber, partType]);
+
   const handleSaveChapter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStoryId || !selectedChapterId) {
@@ -198,6 +211,10 @@ export const AuthorEditChapterTab: React.FC<AuthorEditChapterTabProps> = ({
     }
     if (!chapterTitle.trim() || !chapterContent.trim()) {
       onFeedback('error', 'Tiêu đề và nội dung chương không được để trống.');
+      return;
+    }
+    if (duplicateCollisionChapter) {
+      onFeedback('error', `Số thứ tự chương ${chapterNumber} đang trùng với "${duplicateCollisionChapter.title}". Vui lòng đổi số khác để tránh ghi đè.`);
       return;
     }
 
@@ -417,7 +434,11 @@ export const AuthorEditChapterTab: React.FC<AuthorEditChapterTabProps> = ({
                 min={1}
                 value={chapterNumber}
                 onChange={(e) => setChapterNumber(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-xs font-semibold"
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold ${
+                  duplicateCollisionChapter
+                    ? 'border-amber-400 ring-2 ring-amber-300 dark:ring-amber-700 bg-amber-50/50 dark:bg-amber-950/20 text-stone-900 dark:text-stone-100'
+                    : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100'
+                }`}
               />
             </div>
 
@@ -437,6 +458,15 @@ export const AuthorEditChapterTab: React.FC<AuthorEditChapterTabProps> = ({
               </label>
             </div>
           </div>
+
+          {duplicateCollisionChapter && (
+            <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2 animate-in fade-in shadow-2xs">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                Cảnh báo: Số thứ tự chương {chapterNumber} đang trùng với <strong>"{duplicateCollisionChapter.title || `Chương ${chapterNumber}`}"</strong>. Hãy đổi số thứ tự khác để tránh trùng lặp.
+              </span>
+            </div>
+          )}
 
           {/* Conditional Chapter Password Box */}
           {isChapterLocked && (

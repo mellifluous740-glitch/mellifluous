@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Story, Chapter, Announcement, ReaderLetter } from '../types';
 import {
   X,
@@ -62,6 +62,7 @@ import { AuthorSyncTab } from './author/AuthorSyncTab';
 import { AuthorCommentsTab } from './author/AuthorCommentsTab';
 import { getCustomGenres, subscribeToCustomGenres, getStoryGenres, addCustomGenre } from '../utils/genreManager';
 import { isoToDateTimeLocal, dateTimeLocalToIso, formatDateTime } from '../utils/dateUtils';
+import { getNextChapterNumber, findDuplicateChapter, getStoryChapters } from '../data/mockData';
 
 interface AuthorPublishModalProps {
   isOpen: boolean;
@@ -195,7 +196,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
   // New Chapter Form State
   const [targetStoryId, setTargetStoryId] = useState(stories[0]?.id || '');
   const [partType, setPartType] = useState<'main' | 'extra'>('main');
-  const [chapterNumber, setChapterNumber] = useState(1);
+  const [chapterNumber, setChapterNumber] = useState<number>(() => getNextChapterNumber(stories[0]?.id || '', 'main'));
   const [chapterTitle, setChapterTitle] = useState('');
   const [chapterContent, setChapterContent] = useState('');
   const [translatorNote, setTranslatorNote] = useState('');
@@ -203,6 +204,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
   const [chapterPasswordHint, setChapterPasswordHint] = useState('');
   const [chapterPasswordKey, setChapterPasswordKey] = useState('');
   const [chapterPublishDateInput, setChapterPublishDateInput] = useState(() => isoToDateTimeLocal(new Date().toISOString()));
+  const [showOverwriteWarningModal, setShowOverwriteWarningModal] = useState<Chapter | null>(null);
 
   // Sync targetStoryId if stories list updates
   useEffect(() => {
@@ -210,6 +212,49 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
       setTargetStoryId(stories[0].id);
     }
   }, [stories, targetStoryId]);
+
+  // Automatically recalculate next chapter number when story or partType changes
+  useEffect(() => {
+    if (targetStoryId) {
+      const nextNum = getNextChapterNumber(targetStoryId, partType);
+      setChapterNumber(nextNum);
+    }
+  }, [targetStoryId, partType]);
+
+  // When modal opens or tab switches to newChapter, re-check next chapter number
+  useEffect(() => {
+    if (isOpen && activeTab === 'newChapter' && targetStoryId) {
+      const nextNum = getNextChapterNumber(targetStoryId, partType);
+      setChapterNumber(nextNum);
+    }
+  }, [isOpen, activeTab, targetStoryId]);
+
+  // Next recommended chapter number for target story and partType
+  const computedNextChapterNum = useMemo(() => {
+    return getNextChapterNumber(targetStoryId, partType);
+  }, [targetStoryId, partType, isOpen, activeTab]);
+
+  // Check if current chapterNumber collides with an existing chapter
+  const duplicateChapter = useMemo(() => {
+    if (!targetStoryId || !chapterNumber) return null;
+    return findDuplicateChapter(targetStoryId, chapterNumber, partType) || null;
+  }, [targetStoryId, chapterNumber, partType, isOpen, activeTab]);
+
+  // Story chapter stats helper
+  const storyChaptersInfo = useMemo(() => {
+    if (!targetStoryId) return { mainCount: 0, extraCount: 0, highestMain: 0, highestExtra: 0 };
+    const list = getStoryChapters(targetStoryId);
+    const mainList = list.filter((c) => !c.isExtra && c.partType !== 'extra');
+    const extraList = list.filter((c) => c.isExtra || c.partType === 'extra');
+    const highestMain = mainList.length > 0 ? Math.max(...mainList.map((c) => Number(c.chapterNumber) || 0)) : 0;
+    const highestExtra = extraList.length > 0 ? Math.max(...extraList.map((c) => Number(c.extraNumber || c.chapterNumber) || 0)) : 0;
+    return {
+      mainCount: mainList.length,
+      extraCount: extraList.length,
+      highestMain,
+      highestExtra,
+    };
+  }, [targetStoryId, isOpen, activeTab]);
 
   if (!isOpen) return null;
 
@@ -360,12 +405,17 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
   };
 
   // 2. Publish New Chapter
-  const handleCreateChapter = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeCreateChapter = async (forceOverwrite = false) => {
     const effectiveStoryId = targetStoryId || (stories.length > 0 ? stories[0].id : '');
     const effectiveTitle = chapterTitle.trim() || (partType === 'extra' ? `Ngoại truyện ${chapterNumber}` : `Chương ${chapterNumber}`);
     if (!effectiveStoryId || !chapterContent.trim()) {
       showFeedback('error', 'Vui lòng chọn truyện và nhập nội dung chương.');
+      return;
+    }
+
+    // Safety intercept: Prevent silent accidental overwrite
+    if (!forceOverwrite && duplicateChapter) {
+      setShowOverwriteWarningModal(duplicateChapter);
       return;
     }
 
@@ -411,7 +461,11 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
       setChapterPasswordHint('');
       setChapterPasswordKey('');
       setIsChapterLocked(false);
-      setChapterNumber((prev) => prev + 1);
+      setShowOverwriteWarningModal(null);
+      
+      // Auto-advance safely to the next chapter number
+      const nextNum = getNextChapterNumber(effectiveStoryId, partType);
+      setChapterNumber(nextNum);
 
       if (onStoriesUpdated) onStoriesUpdated();
     } catch (err: any) {
@@ -420,6 +474,11 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleCreateChapter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeCreateChapter(false);
   };
 
   // Delete Story handler
@@ -1230,27 +1289,95 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-stone-800 dark:text-stone-100">
-                    Số thứ tự chương
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={chapterNumber}
-                    onChange={(e) => setChapterNumber(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-xs"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                      Số thứ tự chương <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-stone-500 dark:text-stone-400 font-medium">
+                      {partType === 'extra' ? (
+                        <>Hiện có: <strong className="text-stone-700 dark:text-stone-200">{storyChaptersInfo.highestExtra}</strong> PN</>
+                      ) : (
+                        <>Hiện có: <strong className="text-stone-700 dark:text-stone-200">{storyChaptersInfo.highestMain}</strong> chương</>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      value={chapterNumber}
+                      onChange={(e) => setChapterNumber(Math.max(1, Number(e.target.value) || 1))}
+                      className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-xs font-semibold transition-all ${
+                        duplicateChapter
+                          ? 'border-amber-400 ring-2 ring-amber-300 dark:ring-amber-700 bg-amber-50/40 dark:bg-amber-950/20'
+                          : 'border-stone-300 dark:border-stone-600 focus:ring-2 focus:ring-pink-300'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      title="Gợi ý số chương tiếp theo an toàn"
+                      onClick={() => setChapterNumber(computedNextChapterNum)}
+                      className="px-2.5 py-1.5 rounded-xl border border-pink-200 dark:border-stone-700 bg-pink-50 hover:bg-pink-100 dark:bg-stone-800 dark:hover:bg-stone-700 text-pink-700 dark:text-pink-300 text-[11px] font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1 transition-colors shrink-0"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                      <span>C.{computedNextChapterNum}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
+              {/* Duplicate Chapter Warning Banner */}
+              {duplicateChapter && (
+                <div className="p-3.5 rounded-2xl bg-amber-50/95 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-in fade-in shadow-2xs">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-amber-900 dark:text-amber-200">
+                        Cảnh báo ghi đè: {partType === 'extra' ? 'Phiên ngoại' : 'Chương'} {chapterNumber} đã tồn tại!
+                      </p>
+                      <p className="text-[11px] text-amber-800/95 dark:text-amber-300/95 leading-relaxed">
+                        Tác phẩm này đã có sẵn chương <strong>"{duplicateChapter.title || `Chương ${chapterNumber}`}"</strong>. Nếu tiếp tục đăng với số {chapterNumber}, nội dung chương cũ sẽ bị <strong>ghi đè và mất</strong>!
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5 pl-6">
+                    <button
+                      type="button"
+                      onClick={() => setChapterNumber(computedNextChapterNum)}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Chuyển sang Chương {computedNextChapterNum} (Khuyên dùng)</span>
+                    </button>
+                    <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                      (Để chỉnh sửa chương cũ, vui lòng dùng tab "Chỉnh sửa chương truyện")
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-stone-800 dark:text-stone-100">
-                  Tiêu đề chương <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                    Tiêu đề chương <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prefix = partType === 'extra' ? `Phiên ngoại ${chapterNumber}: ` : `Chương ${chapterNumber}: `;
+                      if (!chapterTitle.startsWith('Chương') && !chapterTitle.startsWith('Phiên ngoại') && !chapterTitle.startsWith('Ngoại truyện')) {
+                        setChapterTitle(`${prefix}${chapterTitle.trim()}`);
+                      }
+                    }}
+                    className="text-[11px] text-pink-600 dark:text-pink-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                  >
+                    <span>Thêm tiền tố "{partType === 'extra' ? `Phiên ngoại ${chapterNumber}:` : `Chương ${chapterNumber}:`}"</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
-                  placeholder="VD: Chương 1: Cơn gió đầu mùa hè năm ấy"
+                  placeholder={`VD: ${partType === 'extra' ? `Phiên ngoại ${chapterNumber}: ` : `Chương ${chapterNumber}: `}Tên chương...`}
                   value={chapterTitle}
                   onChange={(e) => setChapterTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-sm focus:ring-2 focus:ring-pink-300 focus:outline-hidden font-medium"
@@ -1930,6 +2057,71 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Overwrite Confirmation Modal */}
+      {showOverwriteWarningModal && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-stone-900 rounded-3xl p-6 sm:p-7 border border-amber-300 dark:border-amber-700 shadow-2xl space-y-5 animate-in zoom-in-95 text-stone-900 dark:text-stone-100">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-xs">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-2 text-center">
+              <h3 className="font-serif text-lg sm:text-xl font-bold text-amber-900 dark:text-amber-200">
+                Xác nhận ghi đè chương truyện?
+              </h3>
+              <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
+                Bạn đang nhập số thứ tự <strong>{partType === 'extra' ? 'Phiên ngoại' : 'Chương'} {chapterNumber}</strong>, trùng với chương đã có:
+              </p>
+              <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-left text-xs text-amber-950 dark:text-amber-200 space-y-1">
+                <p className="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Cảnh báo: Nội dung chương cũ sẽ bị THAY THẾ HOÀN TOÀN!</span>
+                </p>
+                <p className="text-[11px] text-stone-700 dark:text-stone-300">
+                  Tên chương hiện có: <strong>"{showOverwriteWarningModal.title || `Chương ${chapterNumber}`}"</strong>
+                </p>
+                <p className="text-[11px] text-stone-600 dark:text-stone-400">
+                  Chương mới tiếp theo được gợi ý là: <strong className="text-pink-600 dark:text-pink-400">Chương {computedNextChapterNum}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setChapterNumber(computedNextChapterNum);
+                  setShowOverwriteWarningModal(null);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Chuyển sang Chương {computedNextChapterNum} (Khuyên dùng)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOverwriteWarningModal(null);
+                  executeCreateChapter(true);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+              >
+                Tôi cố ý muốn ghi đè lên Chương {chapterNumber} này
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowOverwriteWarningModal(null)}
+                className="w-full py-2 px-4 rounded-xl text-stone-500 dark:text-stone-400 text-xs hover:text-stone-800 dark:hover:text-stone-200 transition-colors cursor-pointer"
+              >
+                Quay lại kiểm tra
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

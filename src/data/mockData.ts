@@ -358,6 +358,46 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
   return merged;
 };
 
+/**
+ * Automatically computes the next sequential chapter number for a given story and partType.
+ * Never defaults to 1 if the story already has chapters.
+ */
+export const getNextChapterNumber = (storyId: string, partType: 'main' | 'extra' = 'main'): number => {
+  if (!storyId) return 1;
+  const list = getStoryChapters(storyId);
+  if (!list || list.length === 0) return 1;
+
+  if (partType === 'extra') {
+    const extraList = list.filter((c) => c.isExtra || c.partType === 'extra');
+    if (extraList.length === 0) return 1;
+    const max = Math.max(0, ...extraList.map((c) => Number(c.extraNumber || c.chapterNumber) || 0));
+    return max + 1;
+  } else {
+    const mainList = list.filter((c) => !c.isExtra && c.partType !== 'extra');
+    if (mainList.length === 0) return 1;
+    const max = Math.max(0, ...mainList.map((c) => Number(c.chapterNumber) || 0));
+    return max + 1;
+  }
+};
+
+/**
+ * Checks if a chapter with the specified number and partType already exists in the story.
+ */
+export const findDuplicateChapter = (
+  storyId: string,
+  chapterNumber: number,
+  partType: 'main' | 'extra' = 'main',
+  excludeChapterId?: string
+): Chapter | undefined => {
+  if (!storyId || !chapterNumber) return undefined;
+  const list = getStoryChapters(storyId);
+  return list.find((c) => {
+    if (excludeChapterId && c.id === excludeChapterId) return false;
+    const cPart = c.partType || (c.isExtra ? 'extra' : 'main');
+    return cPart === partType && Number(c.chapterNumber) === Number(chapterNumber);
+  });
+};
+
 const parseDefaultAnnouncements = (): Announcement[] => {
   if (Array.isArray(defaultAnnouncementsJson) && defaultAnnouncementsJson.length > 0) {
     return (defaultAnnouncementsJson as unknown as Announcement[]).filter(
