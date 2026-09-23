@@ -181,7 +181,7 @@ if (typeof window !== 'undefined') {
 export const markFirestoreQuotaExhausted = () => {
   localQuotaExhausted = true;
   try {
-    localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 60 * 60 * 1000));
+    localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 15 * 60 * 1000));
   } catch {}
 };
 
@@ -193,20 +193,19 @@ export const checkAndHandleQuotaError = (err: any): boolean => {
   if (
     code === 'resource-exhausted' ||
     msg.includes('resource-exhausted') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
     msg.includes('Quota limit exceeded') ||
     msg.includes('Free daily write units') ||
     msg.includes('Free daily read units') ||
     msg.includes('daily write units') ||
     msg.includes('daily read units') ||
     msg.includes('Quota exceeded') ||
-    msg.includes('quota metric') ||
-    msg.includes('quota') ||
     str.includes('resource-exhausted') ||
     str.includes('Quota limit exceeded')
   ) {
     localQuotaExhausted = true;
     try {
-      localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 60 * 60 * 1000));
+      localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 15 * 60 * 1000));
     } catch {}
     if (!quotaNoticeLogged) {
       quotaNoticeLogged = true;

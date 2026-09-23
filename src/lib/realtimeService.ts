@@ -142,16 +142,22 @@ export const isFirestoreEnabled = (): boolean => {
 
 export const flagFirestoreQuotaExceeded = (err?: any): boolean => {
   const msg = err?.message || String(err || '');
+  const code = String(err?.code || '');
   if (
+    code === 'resource-exhausted' ||
     msg.includes('RESOURCE_EXHAUSTED') ||
-    msg.includes('quota') ||
-    msg.includes('Quota') ||
-    msg.includes('resource-exhausted')
+    msg.includes('resource-exhausted') ||
+    msg.includes('Quota limit exceeded') ||
+    msg.includes('Free daily write units') ||
+    msg.includes('Free daily read units') ||
+    msg.includes('daily write units') ||
+    msg.includes('daily read units') ||
+    msg.includes('Quota exceeded')
   ) {
     isFirestoreQuotaBlocked = true;
-    quotaBlockedUntil = Date.now() + 60 * 60 * 1000; // 1 hour backoff
+    quotaBlockedUntil = Date.now() + 15 * 60 * 1000; // 15 minutes backoff
     try {
-      localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 60 * 60 * 1000));
+      localStorage.setItem('mel_firestore_quota_exhausted_until', String(Date.now() + 15 * 60 * 1000));
     } catch {}
     return true;
   }
@@ -281,6 +287,27 @@ if (defaultStatsJson && (defaultStatsJson as any).stories && typeof (defaultStat
   }
 }
 
+// Guarantee baseline views and likes from all canonical stories in STORIES
+try {
+  STORIES.forEach((s) => {
+    if (!s || !s.id) return;
+    const existing = cachedStoryStatsMap.get(s.id);
+    if (existing) {
+      existing.views = Math.max(existing.views, Number(s.views) || 0);
+      existing.likes = Math.max(existing.likes, Number(s.likes) || 0);
+    } else {
+      cachedStoryStatsMap.set(s.id, {
+        views: Number(s.views) || 0,
+        likes: Number(s.likes) || 0,
+        followers: 0,
+        ratingSum: 0,
+        ratingCount: 0,
+        commentCount: 0,
+      });
+    }
+  });
+} catch {}
+
 export const getStoredAllStoryStats = (): Record<string, StoryRealtimeStats> => {
   const result: Record<string, StoryRealtimeStats> = {};
   cachedStoryStatsMap.forEach((stats, id) => {
@@ -318,8 +345,11 @@ export const calculateAggregateStoryLikes = (): number => {
       stories.forEach((s) => {
         if (!s || !s.id || isStoryDeleted(s.id)) return;
         seenIds.add(s.id);
-        const statLikes = allStats[s.id]?.likes !== undefined ? allStats[s.id].likes : (cachedStoryStatsMap.get(s.id)?.likes ?? s.likes);
-        sum += Math.max(0, Number(statLikes) || 0);
+        const storyBaseLikes = Math.max(0, Number(s.likes) || 0);
+        const cachedLikes = Math.max(0, Number(cachedStoryStatsMap.get(s.id)?.likes) || 0);
+        const allStatLikes = allStats[s.id]?.likes !== undefined ? Math.max(0, Number(allStats[s.id].likes) || 0) : 0;
+        const effectiveLikes = Math.max(storyBaseLikes, cachedLikes, allStatLikes);
+        sum += effectiveLikes;
       });
     }
 
@@ -355,7 +385,7 @@ export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtim
   // Automatically recalculate aggregate likes across all stories and notify global stats
   const aggLikes = calculateAggregateStoryLikes();
   notifyGlobalStatsSubscribers({
-    totalLikes: Math.max(cachedGlobalStats.totalLikes, aggLikes),
+    totalLikes: aggLikes,
   });
 };
 
@@ -1427,7 +1457,7 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
     const isVisible = typeof document === 'undefined' || document.visibilityState === 'visible';
     if (isVisible && isFirestoreEnabled() && !checkIsFirestoreBlocked()) {
       const lastFsHeartbeat = Number(sessionStorage.getItem('mel_last_fs_heartbeat') || 0);
-      if (Date.now() - lastFsHeartbeat >= 115000) {
+      if (Date.now() - lastFsHeartbeat >= 45000) {
         sessionStorage.setItem('mel_last_fs_heartbeat', String(Date.now()));
         const presenceDocRef = doc(db, 'site_stats', 'live_presence');
         setDoc(
@@ -1447,8 +1477,8 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
   // Immediate heartbeat
   sendHeartbeat();
 
-  // Periodic heartbeat every 60 seconds (local mesh is free, Firestore throttled to 120s)
-  const heartbeatTimer = setInterval(sendHeartbeat, 60000);
+  // Periodic heartbeat every 45 seconds (synchronizes accurately across devices)
+  const heartbeatTimer = setInterval(sendHeartbeat, 45000);
 
   // Send immediate heartbeat when reader returns to tab / focuses
   const handleVisibility = () => {
@@ -1493,7 +1523,7 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
       .then((r) => (r && r.ok ? r.json() : null))
       .then((data) => {
         if (typeof data?.count === 'number') {
-          updateLiveActiveReaders(data.count);
+          updateLiveActiveReaders(Math.max(data.count, currentLiveActiveReaders));
         }
       })
       .catch(() => {
@@ -1513,7 +1543,8 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
           if (docSnap.exists()) {
             const data = docSnap.data() || {};
             const now = Date.now();
-            const threshold = now - 50000;
+            // Active window: readers active within the last 110 seconds
+            const threshold = now - 110000;
             let cloudCount = 0;
             for (const [key, val] of Object.entries(data)) {
               if (key !== 'updatedAt' && typeof val === 'number' && val > threshold) {
@@ -1522,9 +1553,7 @@ export const startActiveReaderHeartbeat = (onCountChange: (count: number) => voi
             }
             const localTabs = getLocalActiveTabsCount();
             const effectiveCount = Math.max(1, cloudCount, localTabs);
-            if (!hasBackendServer()) {
-              updateLiveActiveReaders(effectiveCount);
-            }
+            updateLiveActiveReaders(effectiveCount);
           }
         },
         (err) => {
@@ -1954,6 +1983,26 @@ export const toggleStoryLike = async (storyId: string, isLiking: boolean): Promi
  */
 export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): Promise<void> => {
   const delta = isFollowing ? 1 : -1;
+
+  // 0. Immediate optimistic update locally
+  const currentStats = cachedStoryStatsMap.get(storyId) || {
+    views: 0,
+    likes: 0,
+    followers: 0,
+    ratingSum: 0,
+    ratingCount: 0,
+    commentCount: 0,
+  };
+  const updatedFollowers = Math.max(0, (currentStats.followers || 0) + delta);
+  notifyStoryStatsSubscribers(storyId, {
+    ...currentStats,
+    followers: updatedFollowers,
+  });
+
+  notifyGlobalStatsSubscribers({
+    totalFollowers: Math.max(0, (cachedGlobalStats.totalFollowers || 0) + delta),
+  });
+
   // 1. Server Engine
   if (hasBackendServer()) {
     safeApiFetch(`/api/stories/${encodeURIComponent(storyId)}/follow`, {
