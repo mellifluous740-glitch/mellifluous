@@ -213,39 +213,40 @@ export const sortAnnouncements = (list: Announcement[]): Announcement[] => {
 };
 
 /**
- * Safely merges two lists of chapters, deduplicating by ID or chapterNumber + partType,
- * ensuring author edits and newly published chapters are preserved.
+ * Safely merges two lists of chapters without ever dropping published chapters,
+ * deduplicating by ID or storyId + partType + chapterNumber.
  */
 export const mergeChapters = (base: Chapter[], incoming: Chapter[]): Chapter[] => {
   if (!Array.isArray(incoming) || incoming.length === 0) return base || [];
   if (!Array.isArray(base) || base.length === 0) return incoming;
-  const map = new Map<string, Chapter>();
-  const incomingKeys = new Set<string>();
-  const isAuthorDevice = typeof window !== 'undefined' && Boolean(getGithubConfig().token);
 
-  // 1. Authoritative incoming chapters from remote (GitHub / API)
-  incoming.forEach((ch) => {
+  const map = new Map<string, Chapter>();
+
+  // 1. Add all base chapters into map first
+  base.forEach((ch) => {
+    if (!ch || (ch as any).deleted) return;
     const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
-    incomingKeys.add(key);
     map.set(key, ch);
   });
 
-  // 2. Local drafts retention (Only for author/admin device)
-  base.forEach((ch) => {
+  // 2. Safely merge incoming chapters without dropping any base chapters!
+  incoming.forEach((ch) => {
+    if (!ch || (ch as any).deleted) return;
     const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
-    if (!incomingKeys.has(key)) {
-      const time = parseSafeTimestamp(ch.updatedAt || ch.publishedAt);
-      const isFreshLocal = time > 0 && (Date.now() - time) < 15 * 60 * 1000;
-      if (isFreshLocal && isAuthorDevice) {
-        map.set(key, ch);
-      }
-    } else if (isAuthorDevice) {
-      // Author device only: check if local has un-pushed edits
-      const incomingCh = map.get(key)!;
-      const existingTime = parseSafeTimestamp(ch.updatedAt || ch.publishedAt);
-      const incomingTime = parseSafeTimestamp(incomingCh.updatedAt || incomingCh.publishedAt);
-      if (existingTime > incomingTime && existingTime > 0) {
-        map.set(key, { ...incomingCh, ...ch });
+    if (!map.has(key)) {
+      map.set(key, ch);
+    } else {
+      const existing = map.get(key)!;
+      const existingTime = parseSafeTimestamp(existing.updatedAt || existing.publishedAt);
+      const incomingTime = parseSafeTimestamp(ch.updatedAt || ch.publishedAt);
+      const incomingContentLen = (ch.content || '').length;
+      const existingContentLen = (existing.content || '').length;
+
+      // Incoming takes precedence if newer timestamp, or if equal and content is longer
+      if (incomingTime > existingTime || (incomingTime === existingTime && incomingContentLen >= existingContentLen)) {
+        map.set(key, { ...existing, ...ch });
+      } else if (incomingContentLen > existingContentLen) {
+        map.set(key, { ...existing, ...ch, content: ch.content });
       }
     }
   });

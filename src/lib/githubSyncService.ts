@@ -5,7 +5,7 @@
  */
 
 import { Story, Chapter, Announcement, ReaderLetter } from '../types';
-import { isStoryDeleted } from '../data/mockData';
+import { isStoryDeleted, isChapterDeleted } from '../data/mockData';
 
 export interface GithubConfig {
   repo: string; // e.g. "maianhpham927-glitch/mellifluous"
@@ -443,12 +443,16 @@ export async function commitGithubDataFile(
               } else {
                 const chMap = new Map<string, Chapter>();
                 remoteList.forEach((c) => {
-                  const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
-                  chMap.set(k, c);
+                  if (c && !(c as any).deleted && !isChapterDeleted(c.id)) {
+                    const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                    chMap.set(k, c);
+                  }
                 });
                 localList.forEach((c) => {
-                  const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
-                  chMap.set(k, c);
+                  if (c && !(c as any).deleted && !isChapterDeleted(c.id)) {
+                    const k = c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`;
+                    chMap.set(k, c);
+                  }
                 });
                 mergedChapters[storyId] = Array.from(chMap.values()).sort((a, b) => {
                   const numA = Number(a.chapterNumber) || 0;

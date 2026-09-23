@@ -1,5 +1,36 @@
 [
   {
+    "id": "huong-dan-lang-phi-tinh-yeu",
+    "title": "Hướng dẫn lãng phí tình yêu",
+    "originalTitle": "",
+    "author": "Quy Ngư",
+    "translator": "Mellifluous",
+    "status": "completed",
+    "genre": [
+      "Ngôn tình",
+      "Hiện đại",
+      "Đô thị",
+      "Yêu thầm",
+      "Trưởng thành",
+      "Chậm rãi"
+    ],
+    "summary": "<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">Sau này, mỗi lần nghĩ đến núi Phú Sĩ, điều đầu tiên hiện lên trong tâm trí không phải là tuyết, không phải Trần Dịch Tấn, cũng chẳng phải bức tranh 《Sóng lừng ngoài khơi Kanagawa》, mà là đôi mắt ngập tràn vẻ ngái ngủ ấy.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">Thật muốn nghe anh nói một câu, vĩnh hằng không phải là điều bất khả thi.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\"><b>Vài lời</b></p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">1. Thiên về dòng tình cảm thuần túy, không có nhiều tuyến cốt truyện, văn phong có chút sến sẩm.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">2. Nhân vật không hoàn hảo, tuyến tình cảm của nữ chính rất sâu sắc, tuyến tình cảm của nam 9 hơi nhạt nhòa. Cảm giác nu9 sâu đậm hơn còn na9 thì khá thờơ.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">3. Chính văn OE, ngoại truyện HE, xin hãy nhìn nhận chính văn và ngoại truyện một cách độc lập.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">4. Tình dục và tình yêu</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\" style=\"text-align: center;\"><b>BẢN DỊCH CÓ SỰ CHO PHÉP CỦA TÁC GIẢ VỚI MỤC ĐÍCH PHI LỢI NHUẬN</b></p>",
+    "totalChapters": 66,
+    "completedChapters": 66,
+    "mainChaptersCount": 66,
+    "extraChaptersCount": 0,
+    "coverImage": "https://betterthanyesterday027.wordpress.com/wp-content/uploads/2026/08/219fc72b-740d-497d-81dd-79fe1b285e48-1-edited.png",
+    "colorTheme": "from-pink-100 to-rose-200 dark:from-pink-950/40 dark:to-rose-900/40",
+    "hasPassword": false,
+    "passwordHint": "",
+    "passwordKey": "",
+    "updatedAt": "2026-09-23T04:58:00.544Z",
+    "views": 12,
+    "likes": 4,
+    "featured": true,
+    "publishedAt": "2026-09-23T05:04:22.151Z"
+  },
+  {
     "id": "chanh-xanh-cuong-tuong",
     "title": "Chanh xanh cuồng tưởng",
     "originalTitle": "",
@@ -23,9 +54,9 @@
     "hasPassword": false,
     "passwordHint": "",
     "passwordKey": "",
-    "updatedAt": "2026-09-21T16:57:58.263Z",
-    "views": 5,
-    "likes": 1,
+    "updatedAt": "2026-09-23T04:56:33.981Z",
+    "views": 15,
+    "likes": 2,
     "featured": true
   },
   {
@@ -58,7 +89,7 @@
     "views": 4,
     "likes": 0,
     "featured": true,
-    "publishedAt": "2026-09-23T02:43:59.658Z"
+    "publishedAt": "2026-09-23T05:04:22.152Z"
   },
   {
     "id": "vu-ly-thanh",
@@ -158,37 +189,6 @@
     "featured": true
   },
   {
-    "id": "huong-dan-lang-phi-tinh-yeu",
-    "title": "Hướng dẫn lãng phí tình yêu",
-    "originalTitle": "",
-    "author": "Quy Ngư",
-    "translator": "Mellifluous",
-    "status": "completed",
-    "genre": [
-      "Ngôn tình",
-      "Hiện đại",
-      "Đô thị",
-      "Yêu thầm",
-      "Trưởng thành",
-      "Chậm rãi"
-    ],
-    "summary": "<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">Sau này, mỗi lần nghĩ đến núi Phú Sĩ, điều đầu tiên hiện lên trong tâm trí không phải là tuyết, không phải Trần Dịch Tấn, cũng chẳng phải bức tranh 《Sóng lừng ngoài khơi Kanagawa》, mà là đôi mắt ngập tràn vẻ ngái ngủ ấy.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">Thật muốn nghe anh nói một câu, vĩnh hằng không phải là điều bất khả thi.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\"><b>Vài lời</b></p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">1. Thiên về dòng tình cảm thuần túy, không có nhiều tuyến cốt truyện, văn phong có chút sến sẩm.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">2. Nhân vật không hoàn hảo, tuyến tình cảm của nữ chính rất sâu sắc, tuyến tình cảm của nam 9 hơi nhạt nhòa. Cảm giác nu9 sâu đậm hơn còn na9 thì khá thờơ.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">3. Chính văn OE, ngoại truyện HE, xin hãy nhìn nhận chính văn và ngoại truyện một cách độc lập.</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\">4. Tình dục và tình yêu</p>\n<p class=\"indent-0 my-3 sm:my-4 leading-relaxed sm:leading-[1.85]\" style=\"text-align: center;\"><b>BẢN DỊCH CÓ SỰ CHO PHÉP CỦA TÁC GIẢ VỚI MỤC ĐÍCH PHI LỢI NHUẬN</b></p>",
-    "totalChapters": 66,
-    "completedChapters": 66,
-    "mainChaptersCount": 66,
-    "extraChaptersCount": 0,
-    "coverImage": "https://betterthanyesterday027.wordpress.com/wp-content/uploads/2026/08/219fc72b-740d-497d-81dd-79fe1b285e48-1-edited.png",
-    "colorTheme": "from-pink-100 to-rose-200 dark:from-pink-950/40 dark:to-rose-900/40",
-    "hasPassword": false,
-    "passwordHint": "",
-    "passwordKey": "",
-    "updatedAt": "2026-09-20T15:22:34.053Z",
-    "views": 11,
-    "likes": 3,
-    "featured": true,
-    "publishedAt": "2026-09-23T02:43:59.659Z"
-  },
-  {
     "id": "khac-ten-anh-len-bia-mo-cua-em",
     "title": "Khắc tên anh lên bia mộ của em",
     "originalTitle": "",
@@ -212,10 +212,10 @@
     "hasPassword": false,
     "passwordHint": "",
     "passwordKey": "",
-    "updatedAt": "2026-09-20T14:49:08.726Z",
+    "updatedAt": "14/09/2026",
     "views": 9,
     "likes": 0,
     "featured": true,
-    "publishedAt": "2026-09-23T02:43:59.660Z"
+    "publishedAt": "2026-09-23T05:04:22.153Z"
   }
 ]
