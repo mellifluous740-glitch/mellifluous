@@ -23,6 +23,7 @@ import {
   deleteComment,
 } from '../../lib/realtimeService';
 import { backupInteractiveDataToGithub } from '../../lib/githubSyncService';
+import { formatDateTime } from '../../utils/dateUtils';
 
 interface AuthorCommentsTabProps {
   stories: Story[];
@@ -136,17 +137,8 @@ export const AuthorCommentsTab: React.FC<AuthorCommentsTabProps> = ({
   };
 
   const formatDate = (isoStr?: string) => {
-    if (!isoStr) return 'Gần đây';
-    try {
-      const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return isoStr;
-      return `${d.toLocaleDateString('vi-VN')} lúc ${d.toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`;
-    } catch {
-      return isoStr;
-    }
+    if (!isoStr) return '';
+    return formatDateTime(isoStr);
   };
 
   return (

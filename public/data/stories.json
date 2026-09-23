@@ -57,7 +57,8 @@
     "updatedAt": "2026-09-21T11:32:01.151Z",
     "views": 4,
     "likes": 0,
-    "featured": true
+    "featured": true,
+    "publishedAt": "2026-09-23T02:43:59.658Z"
   },
   {
     "id": "vu-ly-thanh",
@@ -184,7 +185,8 @@
     "updatedAt": "2026-09-20T15:22:34.053Z",
     "views": 11,
     "likes": 3,
-    "featured": true
+    "featured": true,
+    "publishedAt": "2026-09-23T02:43:59.659Z"
   },
   {
     "id": "khac-ten-anh-len-bia-mo-cua-em",
@@ -213,6 +215,7 @@
     "updatedAt": "2026-09-20T14:49:08.726Z",
     "views": 9,
     "likes": 0,
-    "featured": true
+    "featured": true,
+    "publishedAt": "2026-09-23T02:43:59.660Z"
   }
 ]

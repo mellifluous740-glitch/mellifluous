@@ -59,7 +59,7 @@ import { AuthorCollaboratorsTab } from './author/AuthorCollaboratorsTab';
 import { AuthorSyncTab } from './author/AuthorSyncTab';
 import { AuthorCommentsTab } from './author/AuthorCommentsTab';
 import { getCustomGenres, subscribeToCustomGenres, getStoryGenres, addCustomGenre } from '../utils/genreManager';
-import { isoToDateTimeLocal, dateTimeLocalToIso } from '../utils/dateUtils';
+import { isoToDateTimeLocal, dateTimeLocalToIso, formatDateTime } from '../utils/dateUtils';
 
 interface AuthorPublishModalProps {
   isOpen: boolean;
@@ -1505,7 +1505,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
                                 )}
                               </div>
                               <p className="text-[11px] text-stone-400 font-mono mt-0.5">
-                                {letter.createdAt ? new Date(letter.createdAt).toLocaleString('vi-VN') : (letter.time || '')}
+                                {letter.createdAt ? formatDateTime(letter.createdAt) : (letter.time || '')}
                               </p>
                             </div>
                           </div>

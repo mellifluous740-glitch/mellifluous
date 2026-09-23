@@ -34,6 +34,7 @@ import { Footer } from './components/Footer';
 import { BackgroundMusicBar } from './components/BackgroundMusicBar';
 import { SakuraPetals } from './components/SakuraPetals';
 import { Clock, Sparkles, CheckCircle2, ArrowLeft, MailOpen, X, ArrowUp, ChevronUp, ChevronDown } from 'lucide-react';
+import { formatDateOnly } from './utils/dateUtils';
 
 const StoryDetailRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,22 +47,8 @@ const StoryChapterRedirect: React.FC = () => {
 };
 
 const formatRelativeTime = (timeStr?: string): string => {
-  if (!timeStr) return 'Vừa đăng';
-  if (timeStr.includes('trước') || timeStr === 'Vừa đăng' || timeStr === 'Mới') {
-    return timeStr;
-  }
-  const date = new Date(timeStr);
-  if (isNaN(date.getTime())) return timeStr;
-  const now = Date.now();
-  const diffMs = now - date.getTime();
-  if (diffMs < 0 || diffMs < 60 * 1000) return 'Vừa xong';
-  const diffMins = Math.floor(diffMs / (60 * 1000));
-  if (diffMins < 60) return `${diffMins} phút trước`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} ngày trước`;
-  return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+  if (!timeStr) return '';
+  return formatDateOnly(timeStr, '');
 };
 
 export default function App() {

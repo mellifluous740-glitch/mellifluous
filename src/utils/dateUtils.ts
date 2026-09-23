@@ -23,19 +23,23 @@ export const parseSafeTimestamp = (dateStr?: string): number => {
     return Date.now();
   }
 
-  // Handle dd/MM/yyyy HH:mm:ss or dd/MM/yyyy HH:mm
-  const slashWithTimeMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  // Handle dd/MM/yyyy or dd/MM/yy HH:mm:ss or HH:mm
+  const slashWithTimeMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
   if (slashWithTimeMatch) {
-    const [, d, m, y, h, min, s] = slashWithTimeMatch;
-    const parsed = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s || 0)).getTime();
+    let [, d, m, y, h, min, s] = slashWithTimeMatch;
+    let fullYear = Number(y);
+    if (fullYear < 100) fullYear += 2000;
+    const parsed = new Date(fullYear, Number(m) - 1, Number(d), Number(h), Number(min), Number(s || 0)).getTime();
     if (!isNaN(parsed)) return parsed;
   }
 
-  // Handle dd/MM/yyyy
-  const slashDateMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Handle dd/MM/yyyy or dd/MM/yy
+  const slashDateMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slashDateMatch) {
-    const [, d, m, y] = slashDateMatch;
-    const parsed = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+    let [, d, m, y] = slashDateMatch;
+    let fullYear = Number(y);
+    if (fullYear < 100) fullYear += 2000;
+    const parsed = new Date(fullYear, Number(m) - 1, Number(d)).getTime();
     if (!isNaN(parsed)) return parsed;
   }
 
@@ -49,8 +53,29 @@ export const parseSafeTimestamp = (dateStr?: string): number => {
 };
 
 /**
- * Formats a date string into Vietnamese full format: HH:mm dd/MM/yyyy
- * Example: 18:45 21/09/2026
+ * Formats a date string into standard date format: dd/mm/yy
+ * Example: 22/09/26
+ */
+export const formatDateOnly = (dateStr?: string, fallback = 'Chưa xác định'): string => {
+  const ts = parseSafeTimestamp(dateStr);
+  if (!ts) return fallback;
+
+  const d = new Date(ts);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const yy = d.getFullYear().toString().slice(-2);
+
+  return `${day}/${month}/${yy}`;
+};
+
+/**
+ * Standard alias for dd/mm/yy formatting
+ */
+export const formatDateStandard = formatDateOnly;
+
+/**
+ * Formats a date string into Vietnamese full format: HH:mm dd/mm/yy
+ * Example: 18:45 21/09/26
  */
 export const formatDateTime = (dateStr?: string, fallback = 'Chưa xác định'): string => {
   const ts = parseSafeTimestamp(dateStr);
@@ -61,71 +86,20 @@ export const formatDateTime = (dateStr?: string, fallback = 'Chưa xác định'
   const minutes = d.getMinutes().toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
+  const yy = d.getFullYear().toString().slice(-2);
 
-  return `${hours}:${minutes} ${day}/${month}/${year}`;
+  return `${hours}:${minutes} ${day}/${month}/${yy}`;
 };
 
 /**
- * Formats a date string into standard date format: dd/MM/yyyy
- * Example: 21/09/2026
+ * Formats time as standard dd/mm/yy (replacing dynamic relative "X phút trước" labels as requested by user).
+ * Example: 22/09/26
  */
-export const formatDateOnly = (dateStr?: string, fallback = 'Chưa xác định'): string => {
-  const ts = parseSafeTimestamp(dateStr);
-  if (!ts) return fallback;
-
-  const d = new Date(ts);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-
-  return `${day}/${month}/${year}`;
-};
-
-/**
- * Calculates human-readable relative time (e.g., "5 phút trước", "2 giờ trước", "3 ngày trước")
- */
-export const formatRelativeTime = (timeStr?: string, fallback = 'Vừa xong'): string => {
+export const formatRelativeTime = (timeStr?: string, fallback = 'Chưa xác định'): string => {
   if (!timeStr) return fallback;
-
-  const trimmed = timeStr.trim();
-  if (trimmed.includes('trước') || trimmed === 'Vừa xong' || trimmed === 'Mới') {
-    return trimmed;
-  }
-
-  const ts = parseSafeTimestamp(trimmed);
-  if (!ts) return trimmed;
-
-  const now = Date.now();
-  const diffMs = now - ts;
-
-  // If time is future or within 60 seconds
-  if (diffMs < 60 * 1000) {
-    return 'Vừa xong';
-  }
-
-  const diffMins = Math.floor(diffMs / (60 * 1000));
-  if (diffMins < 60) {
-    return `${diffMins} phút trước`;
-  }
-
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) {
-    return `${diffHours} giờ trước`;
-  }
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) {
-    return `${diffDays} ngày trước`;
-  }
-
-  const diffWeeks = Math.floor(diffDays / 7);
-  if (diffWeeks < 4) {
-    return `${diffWeeks} tuần trước`;
-  }
-
-  // Older dates: return dd/MM/yyyy
-  return formatDateOnly(timeStr);
+  const formatted = formatDateOnly(timeStr, '');
+  if (formatted) return formatted;
+  return fallback;
 };
 
 /**

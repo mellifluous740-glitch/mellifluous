@@ -3,6 +3,16 @@ import defaultStoriesJson from '../../data/stories.json';
 import defaultChaptersJson from '../../data/chapters.json';
 import defaultAnnouncementsJson from '../../data/announcements.json';
 
+export const CANONICAL_PROTECTED_STORY_IDS = new Set([
+  'chanh-xanh-cuong-tuong',
+  'nang-luc-cua-man-em',
+  'vu-ly-thanh',
+  'tung-thanh',
+  'toi-co-khach-quy',
+  'huong-dan-lang-phi-tinh-yeu',
+  'khac-ten-anh-len-bia-mo-cua-em',
+]);
+
 export const DELETED_OR_LEGACY_STORY_IDS = new Set([
   'anh-dao-nam-centimet',
   'anh-dao-5cm',
@@ -62,9 +72,42 @@ export const unmarkAnnouncementDeleted = (annId: string): void => {
   } catch {}
 };
 
+export const unmarkStoryDeleted = (storyId: string): void => {
+  if (!storyId) return;
+  const cleanId = storyId.trim().toLowerCase();
+  DELETED_OR_LEGACY_STORY_IDS.delete(cleanId);
+  DELETED_OR_LEGACY_STORY_IDS.delete(storyId);
+  try {
+    const raw = localStorage.getItem('mel_deleted_story_ids');
+    if (raw) {
+      const list: string[] = JSON.parse(raw);
+      const filtered = list.filter((id) => id !== storyId && id !== cleanId);
+      localStorage.setItem('mel_deleted_story_ids', JSON.stringify(filtered));
+    }
+  } catch {}
+};
+
+// Auto-cleanse localStorage on module initialization so canonical stories are never hidden
+if (typeof window !== 'undefined') {
+  try {
+    const raw = localStorage.getItem('mel_deleted_story_ids');
+    if (raw) {
+      const list: string[] = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const filtered = list.filter((id) => !CANONICAL_PROTECTED_STORY_IDS.has(id.trim().toLowerCase()));
+        if (filtered.length !== list.length) {
+          localStorage.setItem('mel_deleted_story_ids', JSON.stringify(filtered));
+        }
+      }
+    }
+  } catch {}
+}
+
 export const isStoryDeleted = (storyId?: string): boolean => {
   if (!storyId) return true;
   const cleanId = storyId.trim().toLowerCase();
+  // Canonical stories must never be marked as deleted
+  if (CANONICAL_PROTECTED_STORY_IDS.has(cleanId)) return false;
   if (DELETED_OR_LEGACY_STORY_IDS.has(cleanId) || DELETED_OR_LEGACY_STORY_IDS.has(storyId)) return true;
   try {
     const raw = localStorage.getItem('mel_deleted_story_ids');
@@ -79,6 +122,8 @@ export const isStoryDeleted = (storyId?: string): boolean => {
 export const recordStoryDeleted = (storyId: string): void => {
   if (!storyId) return;
   const cleanId = storyId.trim().toLowerCase();
+  // Never delete canonical user stories
+  if (CANONICAL_PROTECTED_STORY_IDS.has(cleanId)) return;
   DELETED_OR_LEGACY_STORY_IDS.add(cleanId);
   DELETED_OR_LEGACY_STORY_IDS.add(storyId);
   if (cleanId === 'anh-dao-5cm' || cleanId === 'anh-dao-nam-centimet') {
@@ -242,6 +287,18 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        const seed = SAMPLE_CHAPTERS[storyId] || [];
+        if (seed.length > parsed.length) {
+          const seedMap = new Map(seed.map((c) => [c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`, c]));
+          for (const p of parsed) {
+            seedMap.set(p.id || `${p.chapterNumber}_${p.partType || (p.isExtra ? 'extra' : 'main')}`, p);
+          }
+          const merged = Array.from(seedMap.values());
+          try {
+            localStorage.setItem(`mel_chapters_${storyId}`, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        }
         return parsed;
       }
     }
@@ -250,6 +307,18 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
       if (rawAlias !== null) {
         const parsedAlias = JSON.parse(rawAlias);
         if (Array.isArray(parsedAlias) && parsedAlias.length > 0) {
+          const seedAlias = SAMPLE_CHAPTERS[aliasId] || [];
+          if (seedAlias.length > parsedAlias.length) {
+            const seedMap = new Map(seedAlias.map((c) => [c.id || `${c.chapterNumber}_${c.partType || (c.isExtra ? 'extra' : 'main')}`, c]));
+            for (const p of parsedAlias) {
+              seedMap.set(p.id || `${p.chapterNumber}_${p.partType || (p.isExtra ? 'extra' : 'main')}`, p);
+            }
+            const mergedAlias = Array.from(seedMap.values());
+            try {
+              localStorage.setItem(`mel_chapters_${aliasId}`, JSON.stringify(mergedAlias));
+            } catch {}
+            return mergedAlias;
+          }
           return parsedAlias;
         }
       }

@@ -14,6 +14,7 @@ import {
 } from '../data/mockData';
 import { Story, Chapter, Announcement } from '../types';
 import { getSavedPersonalCodes } from './letterVaultService';
+import { formatDateOnly } from '../utils/dateUtils';
 
 export type NotificationType = 'comment' | 'letter' | 'chapter' | 'story' | 'reply' | 'announcement' | 'letter_reply';
 
@@ -73,19 +74,8 @@ const saveReadIds = (ids: Set<string>, uid?: string) => {
 };
 
 const formatNotificationTime = (timeStr?: string): string => {
-  if (!timeStr) return 'Vừa xong';
-  const date = new Date(timeStr);
-  if (isNaN(date.getTime())) return timeStr;
-  const now = Date.now();
-  const diffMs = now - date.getTime();
-  if (diffMs < 0 || diffMs < 60 * 1000) return 'Vừa xong';
-  const diffMins = Math.floor(diffMs / (60 * 1000));
-  if (diffMins < 60) return `${diffMins} phút trước`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} ngày trước`;
-  return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+  if (!timeStr) return '';
+  return formatDateOnly(timeStr, '');
 };
 
 type NotificationSubscriber = (items: AuthorNotificationItem[], unreadCount: number) => void;

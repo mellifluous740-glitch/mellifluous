@@ -1460,7 +1460,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                           ) : null}
                         </div>
                         <span className={`text-[10px] font-mono shrink-0 ${currentTheme.subtextColor}`}>
-                          {cmt.time || (cmt.createdAt ? new Date(cmt.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong')}
+                          {formatDateOnly(cmt.createdAt || cmt.time)}
                         </span>
                       </div>
 
@@ -1646,7 +1646,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                                   ) : null}
                                 </div>
                                 <span className={`text-[10px] font-mono shrink-0 ${currentTheme.subtextColor}`}>
-                                  {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                  {formatDateOnly(rep.createdAt)}
                                 </span>
                               </div>
 

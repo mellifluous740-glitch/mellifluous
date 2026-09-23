@@ -14,6 +14,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { publishAnnouncement, deleteAnnouncement } from '../../lib/realtimeService';
+import { formatDateOnly } from '../../utils/dateUtils';
 import { RichTextEditor } from '../common/RichTextEditor';
 import { RichTextRenderer } from '../common/RichTextRenderer';
 
@@ -69,7 +70,7 @@ export const AuthorAnnouncementsTab: React.FC<AuthorAnnouncementsTabProps> = ({
         title: title.trim(),
         tag,
         content: content.trim(),
-        date: new Date().toLocaleDateString('vi-VN'),
+        date: formatDateOnly(new Date().toISOString()),
         isPinned,
       };
 
@@ -292,7 +293,7 @@ export const AuthorAnnouncementsTab: React.FC<AuthorAnnouncementsTabProps> = ({
                           )}
                           <span className="text-[11px] text-stone-400 font-mono flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            <span>{ann.date}</span>
+                            <span>{formatDateOnly(ann.date)}</span>
                           </span>
                         </div>
 

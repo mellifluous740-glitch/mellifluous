@@ -18,6 +18,7 @@ import { SUMMER_QUOTES, isStoryDeleted } from '../data/mockData';
 import { sortAnnouncements } from '../lib/realtimeService';
 import { SidebarStoryDropdown } from './SidebarStoryDropdown';
 import { SidebarGenreDropdown } from './SidebarGenreDropdown';
+import { formatDateOnly } from '../utils/dateUtils';
 import { RichTextRenderer } from './common/RichTextRenderer';
 
 interface SidebarProps {
@@ -150,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400 flex items-center gap-1 shrink-0">
                     <Clock className="w-3 h-3" />
-                    <span>{notice.date}</span>
+                    <span>{formatDateOnly(notice.date)}</span>
                   </span>
                 </div>
 
@@ -284,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     🌸 {item.storyTitle}
                   </span>
                   <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-stone-200/60 dark:bg-stone-800 shrink-0">
-                    {item.timeAgo}
+                    {formatDateOnly(item.timeAgo)}
                   </span>
                 </div>
 

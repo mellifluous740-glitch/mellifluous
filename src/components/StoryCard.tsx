@@ -23,7 +23,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
   const [ratingCount, setRatingCount] = useState<number>(0);
   const [publishedCount, setPublishedCount] = useState<number>(() => {
     const list = getStoryChapters(story.id);
-    return list.length > 0 ? list.length : (story.completedChapters || 0);
+    return Math.max(story.completedChapters || 0, list.length);
   });
   const [isLiked, setIsLiked] = useState<boolean>(() => {
     try {
@@ -35,10 +35,10 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
 
   useEffect(() => {
     const list = getStoryChapters(story.id);
-    setPublishedCount(list.length > 0 ? list.length : (story.completedChapters || 0));
+    setPublishedCount(Math.max(story.completedChapters || 0, list.length));
 
     const unsubChapters = subscribeToStoryChapters(story.id, (chs) => {
-      setPublishedCount(chs.length > 0 ? chs.length : (story.completedChapters || 0));
+      setPublishedCount(Math.max(story.completedChapters || 0, chs.length));
     });
 
     const unsubscribe = subscribeToStoryStats(
@@ -251,11 +251,11 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
             </div>
             {story.updatedAt ? (
               <span className="text-[10px] text-stone-400 block" title={formatDateTime(story.updatedAt)}>
-                {formatRelativeTime(story.updatedAt)}
+                Cập nhật: {formatDateOnly(story.updatedAt)}
               </span>
             ) : story.publishedAt ? (
               <span className="text-[10px] text-stone-400 block" title={formatDateTime(story.publishedAt)}>
-                {formatDateOnly(story.publishedAt)}
+                Đăng: {formatDateOnly(story.publishedAt)}
               </span>
             ) : null}
           </div>

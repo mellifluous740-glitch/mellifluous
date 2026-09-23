@@ -485,7 +485,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
               <div>
                 <span className="text-stone-400 block text-[11px]">Đã cập nhật</span>
                 <strong className="text-stone-800 dark:text-stone-200 block">
-                  {chapters.length > 0 ? chapters.length : (story.completedChapters || 0)}/{story.totalChapters} chương
+                  {Math.max(story.completedChapters || 0, chapters.length)}/{story.totalChapters} chương
                 </strong>
                 <span className="text-[11px] text-pink-600 dark:text-pink-400">
                   {mainChapters.length} chính + {extraChapters.length} ngoại
@@ -511,7 +511,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                 {story.updatedAt && (
                   <span className="flex items-center gap-1">
                     <span>•</span>
-                    <span>Cập nhật: <strong className="font-medium text-stone-700 dark:text-stone-300">{formatRelativeTime(story.updatedAt)}</strong></span>
+                    <span>Cập nhật: <strong className="font-medium text-stone-700 dark:text-stone-300">{formatDateOnly(story.updatedAt)}</strong></span>
                   </span>
                 )}
               </div>
@@ -765,7 +765,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                         className="text-[11px] font-mono text-stone-400 group-hover:text-pink-500"
                         title={formatDateTime(ch.publishedAt)}
                       >
-                        {formatDateOnly(ch.publishedAt)}                        {ch.publishedAt}
+                        {formatDateOnly(ch.publishedAt)}
                       </span>
                       {isExtra && (
                         <span className="text-[10px] font-semibold px-2 py-0.2 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200/60">
@@ -991,7 +991,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                           ) : null}
                         </div>
                         <span className="text-[11px] font-mono text-stone-400 shrink-0">
-                          {cmt.createdAt ? new Date(cmt.createdAt).toLocaleDateString('vi-VN') : 'Mới đây'}
+                          {cmt.createdAt ? formatDateOnly(cmt.createdAt) : ''}
                         </span>
                       </div>
 
@@ -1177,7 +1177,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                                   ) : null}
                                 </div>
                                 <span className="text-[10px] font-mono text-stone-400">
-                                  {new Date(rep.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                  {rep.createdAt ? formatDateOnly(rep.createdAt) : ''}
                                 </span>
                               </div>
 

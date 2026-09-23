@@ -41,6 +41,8 @@ import {
   isAnnouncementDeleted,
   recordAnnouncementDeleted,
   unmarkAnnouncementDeleted,
+  CANONICAL_PROTECTED_STORY_IDS,
+  unmarkStoryDeleted,
 } from '../data/mockData';
 import { buildApiUrl, hasBackendServer, safeApiFetch } from './apiConfig';
 import { bgmEngine } from '../utils/audioPlayer';
@@ -166,9 +168,11 @@ export const parseSafeTimestamp = (dateStr?: string): number => {
   }
   const parsed = new Date(dateStr).getTime();
   if (!isNaN(parsed) && parsed > 0) return parsed;
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dateStr)) {
     const [d, m, y] = dateStr.split('/');
-    const dTime = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+    let fullYear = Number(y);
+    if (fullYear < 100) fullYear += 2000;
+    const dTime = new Date(fullYear, Number(m) - 1, Number(d)).getTime();
     if (!isNaN(dTime)) return dTime;
   }
   return 0;
@@ -510,6 +514,20 @@ export const getStoredStories = (): Story[] => {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const filtered = parsed.filter((s) => !isStoryDeleted(s.id) && !LEGACY_MOCK_STORY_IDS.has(s.id));
+        // Ensure all canonical stories from bundled default are present
+        const currentIds = new Set(filtered.map((s) => s.id));
+        let missingAdded = false;
+        for (const base of STORIES) {
+          if (!currentIds.has(base.id) && !isStoryDeleted(base.id) && !LEGACY_MOCK_STORY_IDS.has(base.id)) {
+            filtered.push(base);
+            missingAdded = true;
+          }
+        }
+        if (missingAdded) {
+          try {
+            localStorage.setItem('mel_published_stories', JSON.stringify(filtered));
+          } catch {}
+        }
         if (filtered.length > 0) {
           return filtered;
         }
@@ -3532,19 +3550,18 @@ export const subscribeToPublishedStories = (
         // 2. Handle stories that exist only in local storage
         for (const s of current) {
           if (!incomingIds.has(s.id)) {
-            if (localDel.has(s.id) || LEGACY_MOCK_STORY_IDS.has(s.id)) {
+            if (LEGACY_MOCK_STORY_IDS.has(s.id)) {
               continue;
             }
-            const sTime = parseSafeTimestamp(s.updatedAt);
-            const isFreshLocalCreation = sTime > 0 && (Date.now() - sTime) < 15 * 60 * 1000;
-            if (isFreshLocalCreation) {
-              // Newly created story locally that hasn't finished pushing yet
+            if (CANONICAL_PROTECTED_STORY_IDS.has(s.id)) {
               mergedMap.set(s.id, s);
-            } else {
-              // It was deleted on remote! Purge it from this browser
-              localDel.add(s.id);
-              recordStoryDeleted(s.id);
+              continue;
             }
+            if (localDel.has(s.id)) {
+              continue;
+            }
+            // Keep existing stories safe to avoid accidental data loss across tabs/devices
+            mergedMap.set(s.id, s);
           }
         }
 
