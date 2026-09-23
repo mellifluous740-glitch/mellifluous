@@ -256,9 +256,8 @@ export const mergeChapters = (base: Chapter[], incoming: Chapter[]): Chapter[] =
         map.set(key, ch);
       } else if (incomingTime > existingTime || (incomingTime === existingTime && incomingContentLen >= existingContentLen)) {
         map.set(key, { ...existing, ...ch });
-      } else if (incomingContentLen > existingContentLen) {
-        map.set(key, { ...existing, ...ch, content: ch.content });
       }
+      // Never allow older incoming content to overwrite a newer local edit!
     }
   });
 

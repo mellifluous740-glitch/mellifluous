@@ -324,7 +324,9 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
   const map = new Map<string, Chapter>();
   const addChapterToMap = (ch: Chapter) => {
     if (!ch || (ch as any).deleted || isChapterDeleted(ch.id)) return;
-    const key = ch.id || `${ch.storyId || storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
+    const part = ch.partType || (ch.isExtra ? 'extra' : 'main');
+    const num = Number(ch.chapterNumber) || 0;
+    const key = `${ch.storyId || storyId}-${part}-${num}`;
     if (!map.has(key)) {
       map.set(key, ch);
     } else {
@@ -333,11 +335,11 @@ export const getStoryChapters = (storyId: string): Chapter[] => {
       const curLen = (ch.content || '').length;
       const exTime = new Date(existing.updatedAt || existing.publishedAt || 0).getTime();
       const curTime = new Date(ch.updatedAt || ch.publishedAt || 0).getTime();
+      // Only newer timestamp wins. If timestamps are exactly equal, pick the longer content.
       if (curTime > exTime || (curTime === exTime && curLen >= exLen)) {
         map.set(key, { ...existing, ...ch });
-      } else if (curLen > exLen) {
-        map.set(key, { ...existing, ...ch, content: ch.content });
       }
+      // Never overwrite a newer timestamp with an older chapter just because it had more characters!
     }
   };
 
