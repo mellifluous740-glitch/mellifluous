@@ -226,6 +226,8 @@ export async function fetchRawGithubJson<T>(filename: string): Promise<T | null>
       const res = await fetch(url, {
         headers: {
           Accept: 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+          Pragma: 'no-cache',
         },
         cache: 'no-store',
       });

@@ -309,7 +309,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
                 <div>
                   <span className="text-stone-400 dark:text-stone-500 block text-[11px]">Đã cập nhật</span>
                   <strong className="text-stone-800 dark:text-stone-200 block">
-                    {Math.max(story.completedChapters || 0, liveChapters.length)}/{story.totalChapters} chương
+                    {liveChapters.length > 0 ? liveChapters.length : (story.completedChapters || 0)}/{story.totalChapters} chương
                   </strong>
                   <span className="text-[10px] text-pink-600 dark:text-pink-400">
                     {mainChapters.length} chính + {extraChapters.length} ngoại

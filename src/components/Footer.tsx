@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Users, Eye, Sparkles, Activity, MessageSquare, BookmarkCheck } from 'lucide-react';
+import { Heart, Users, Eye, Sparkles, Activity, MessageSquare, BookmarkCheck, RefreshCw } from 'lucide-react';
 import {
   subscribeToGlobalStats,
   startActiveReaderHeartbeat,
   recordSiteVisit,
+  forceRefreshAllData,
 } from '../lib/realtimeService';
 import { GlobalRealtimeStats } from '../types';
 
@@ -17,6 +18,26 @@ export const Footer: React.FC = () => {
     totalLikes: 0,
   });
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true);
+    setRefreshMessage(null);
+    try {
+      const res = await forceRefreshAllData();
+      if (res.success) {
+        setRefreshMessage('Đã tải lại dữ liệu mới nhất!');
+      } else {
+        setRefreshMessage('Đã làm mới bộ nhớ cache.');
+      }
+    } catch {
+      setRefreshMessage('Đã làm mới!');
+    } finally {
+      setIsRefreshing(false);
+      setTimeout(() => setRefreshMessage(null), 3000);
+    }
+  };
 
   useEffect(() => {
     // 1. Record this visit to Firestore
@@ -181,9 +202,26 @@ export const Footer: React.FC = () => {
 
         {/* Realtime Status Indicator & Copyright */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs pt-4 border-t border-pink-100/60 dark:border-stone-800">
-          <div className="flex items-center gap-2 text-stone-500 dark:text-stone-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>Cập nhật qua Firestore Cloud</span>
+          <div className="flex flex-wrap items-center gap-3 text-stone-500 dark:text-stone-400">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Cập nhật qua Cloud & GitHub</span>
+            </div>
+
+            <button
+              onClick={handleForceRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-pink-100/70 hover:bg-pink-200/80 dark:bg-stone-800/80 dark:hover:bg-stone-700 text-pink-700 dark:text-pink-300 border border-pink-200/70 dark:border-stone-700 cursor-pointer transition-all hover:shadow-xs active:scale-95 disabled:opacity-50"
+              title="Bấm để làm mới dữ liệu và tải lại các chương truyện, thông báo mới nhất từ máy chủ"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-pink-600 dark:text-pink-400' : ''}`} />
+              <span>{isRefreshing ? 'Đang cập nhật...' : 'Làm mới dữ liệu'}</span>
+            </button>
+            {refreshMessage && (
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                ✓ {refreshMessage}
+              </span>
+            )}
           </div>
 
           <div className="text-center sm:text-right space-y-1">

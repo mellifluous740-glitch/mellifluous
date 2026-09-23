@@ -485,7 +485,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
               <div>
                 <span className="text-stone-400 block text-[11px]">Đã cập nhật</span>
                 <strong className="text-stone-800 dark:text-stone-200 block">
-                  {Math.max(story.completedChapters || 0, chapters.length)}/{story.totalChapters} chương
+                  {chapters.length > 0 ? chapters.length : (story.completedChapters || 0)}/{story.totalChapters} chương
                 </strong>
                 <span className="text-[11px] text-pink-600 dark:text-pink-400">
                   {mainChapters.length} chính + {extraChapters.length} ngoại

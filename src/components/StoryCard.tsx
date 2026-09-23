@@ -23,7 +23,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
   const [ratingCount, setRatingCount] = useState<number>(0);
   const [publishedCount, setPublishedCount] = useState<number>(() => {
     const list = getStoryChapters(story.id);
-    return Math.max(story.completedChapters || 0, list.length);
+    return list.length > 0 ? list.length : (story.completedChapters || 0);
   });
   const [isLiked, setIsLiked] = useState<boolean>(() => {
     try {
@@ -35,10 +35,10 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
 
   useEffect(() => {
     const list = getStoryChapters(story.id);
-    setPublishedCount(Math.max(story.completedChapters || 0, list.length));
+    setPublishedCount(list.length > 0 ? list.length : (story.completedChapters || 0));
 
     const unsubChapters = subscribeToStoryChapters(story.id, (chs) => {
-      setPublishedCount(Math.max(story.completedChapters || 0, chs.length));
+      setPublishedCount(chs.length > 0 ? chs.length : (story.completedChapters || 0));
     });
 
     const unsubscribe = subscribeToStoryStats(

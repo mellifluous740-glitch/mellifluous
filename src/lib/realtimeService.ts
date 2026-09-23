@@ -207,28 +207,30 @@ export const sortAnnouncements = (list: Announcement[]): Announcement[] => {
  * ensuring author edits and newly published chapters are preserved.
  */
 export const mergeChapters = (base: Chapter[], incoming: Chapter[]): Chapter[] => {
-  if (!Array.isArray(incoming) || incoming.length === 0) return base;
+  if (!Array.isArray(incoming) || incoming.length === 0) return base || [];
+  if (!Array.isArray(base) || base.length === 0) return incoming;
   const map = new Map<string, Chapter>();
   const incomingKeys = new Set<string>();
+  const isAuthorDevice = typeof window !== 'undefined' && Boolean(getGithubConfig().token);
 
-  // 1. Authoritative incoming chapters from remote
+  // 1. Authoritative incoming chapters from remote (GitHub / API)
   incoming.forEach((ch) => {
     const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
     incomingKeys.add(key);
     map.set(key, ch);
   });
 
-  // 2. Only retain local chapters that are freshly created (< 15 mins) and not in incoming
+  // 2. Local drafts retention (Only for author/admin device)
   base.forEach((ch) => {
     const key = ch.id || `${ch.storyId}-${ch.partType || (ch.isExtra ? 'extra' : 'main')}-${ch.chapterNumber}`;
     if (!incomingKeys.has(key)) {
       const time = parseSafeTimestamp(ch.updatedAt || ch.publishedAt);
       const isFreshLocal = time > 0 && (Date.now() - time) < 15 * 60 * 1000;
-      if (isFreshLocal) {
+      if (isFreshLocal && isAuthorDevice) {
         map.set(key, ch);
       }
-    } else {
-      // It exists in incoming, check if local has newer un-pushed edits
+    } else if (isAuthorDevice) {
+      // Author device only: check if local has un-pushed edits
       const incomingCh = map.get(key)!;
       const existingTime = parseSafeTimestamp(ch.updatedAt || ch.publishedAt);
       const incomingTime = parseSafeTimestamp(incomingCh.updatedAt || incomingCh.publishedAt);
@@ -846,7 +848,7 @@ export const initServerRealtimeSync = () => {
                 ...s,
                 views: Math.max(Number(existing.views) || 0, Number(s.views) || 0),
                 likes: Math.max(Number(existing.likes) || 0, Number(s.likes) || 0),
-                completedChapters: Math.max(Number(existing.completedChapters) || 0, Number(s.completedChapters) || 0),
+                completedChapters: s.completedChapters !== undefined ? Number(s.completedChapters) : (Number(existing.completedChapters) || 0),
               });
               updated = true;
             }
@@ -3495,6 +3497,7 @@ export const subscribeToPublishedStories = (
         // Authoritative remote merge:
         const mergedMap = new Map<string, Story>();
         const incomingIds = new Set(cleanIncoming.map((s) => s.id));
+        const isAuthorDevice = typeof window !== 'undefined' && Boolean(getGithubConfig().token);
 
         // 1. Authoritative incoming stories from Server/GitHub
         for (const inc of cleanIncoming) {
@@ -3505,21 +3508,22 @@ export const subscribeToPublishedStories = (
             const existingTime = parseSafeTimestamp(existing.updatedAt);
             const incTime = parseSafeTimestamp(inc.updatedAt);
 
-            if (existingTime > incTime && incTime > 0) {
+            if (isAuthorDevice && existingTime > incTime && incTime > 0) {
               mergedMap.set(inc.id, {
                 ...inc,
                 ...existing,
                 views: Math.max(Number(existing.views) || 0, Number(inc.views) || 0),
                 likes: Math.max(Number(existing.likes) || 0, Number(inc.likes) || 0),
-                completedChapters: Math.max(Number(existing.completedChapters) || 0, Number(inc.completedChapters) || 0),
+                completedChapters: inc.completedChapters !== undefined ? Number(inc.completedChapters) : (Number(existing.completedChapters) || 0),
               });
             } else {
+              // Remote GitHub data is 100% authoritative for readers!
               mergedMap.set(inc.id, {
                 ...existing,
                 ...inc,
                 views: Math.max(Number(existing.views) || 0, Number(inc.views) || 0),
                 likes: Math.max(Number(existing.likes) || 0, Number(inc.likes) || 0),
-                completedChapters: Math.max(Number(existing.completedChapters) || 0, Number(inc.completedChapters) || 0),
+                completedChapters: inc.completedChapters !== undefined ? Number(inc.completedChapters) : (Number(existing.completedChapters) || 0),
               });
             }
           }
@@ -3634,7 +3638,17 @@ export const subscribeToPublishedStories = (
               return;
             }
 
-            if (item.title && item.author) {
+            const existingStory = currentStored.find((s) => s.id === sId) || STORIES.find((s) => s.id === sId);
+            if (existingStory) {
+              list.push({
+                ...existingStory,
+                views: Math.max(Number(item.views) || 0, Number(existingStory.views) || 0),
+                likes: Math.max(Number(item.likes) || 0, Number(existingStory.likes) || 0),
+                // Keep authoritative completedChapters from GitHub/stories.json
+                completedChapters: existingStory.completedChapters !== undefined ? existingStory.completedChapters : (Number(item.completedChapters) || 0),
+              });
+              seenIds.add(sId);
+            } else if (item.title && item.author) {
               const fullStory: Story = {
                 id: sId,
                 title: item.title,
@@ -3660,17 +3674,6 @@ export const subscribeToPublishedStories = (
               };
               list.push(fullStory);
               seenIds.add(sId);
-            } else {
-              const baseStory = STORIES.find((s) => s.id === sId);
-              if (baseStory && !isStoryDeleted(baseStory.id)) {
-                list.push({
-                  ...baseStory,
-                  views: Number(item.views) || baseStory.views,
-                  likes: Number(item.likes) || baseStory.likes,
-                  completedChapters: Number(item.completedChapters) || baseStory.completedChapters,
-                });
-                seenIds.add(sId);
-              }
             }
           });
 
@@ -4077,14 +4080,16 @@ export const subscribeToAllChapters = (
             grouped['anh-dao-5cm'] = grouped['anh-dao-nam-centimet'];
           }
 
-          // Only fallback to baseline sample chapters for stories that have never had chapters published in Firestore
+          // Merge existing chapters (from GitHub chapters.json) with cloud chapters, never dropping GitHub chapters
           const currentStories = getStoredStories();
           currentStories.forEach((s) => {
-            if (!storiesWithCloudChapters.has(s.id) && (!grouped[s.id] || grouped[s.id].length === 0)) {
-              const baseSamples = (SAMPLE_CHAPTERS[s.id] || []).filter((ch) => !cloudDeletedChapterIds.has(ch.id));
-              if (baseSamples.length > 0) {
-                grouped[s.id] = baseSamples;
-              }
+            const currentList = getStoryChapters(s.id);
+            const baseSamples = (SAMPLE_CHAPTERS[s.id] || []).filter((ch) => !cloudDeletedChapterIds.has(ch.id));
+            const seedChapters = currentList.length > 0 ? currentList : baseSamples;
+            const cloudList = grouped[s.id] || [];
+            const merged = mergeChapters(seedChapters, cloudList).filter((ch) => !cloudDeletedChapterIds.has(ch.id));
+            if (merged.length > 0) {
+              grouped[s.id] = merged;
             }
           });
 
@@ -4170,6 +4175,7 @@ export const subscribeToStoryChapters = (
   }
 
   // 3. Immediately query Server API with GitHub fallback for real-time consistency across devices
+  let pollStoryChaptersInterval: any = null;
   if (typeof window !== 'undefined') {
     const handleIncomingChapters = (incoming: Chapter[]) => {
       if (Array.isArray(incoming) && incoming.length > 0) {
@@ -4186,28 +4192,33 @@ export const subscribeToStoryChapters = (
       }
     };
 
-    if (hasBackendServer()) {
-      safeApiFetch(`/api/chapters?storyId=${encodeURIComponent(storyId)}`)
-        .then((res) => (res && res.ok ? res.json() : null))
-        .then((serverList) => {
-          if (Array.isArray(serverList) && serverList.length > 0) {
-            handleIncomingChapters(serverList);
+    const syncStoryChaptersRemote = () => {
+      if (hasBackendServer()) {
+        safeApiFetch(`/api/chapters?storyId=${encodeURIComponent(storyId)}`)
+          .then((res) => (res && res.ok ? res.json() : null))
+          .then((serverList) => {
+            if (Array.isArray(serverList) && serverList.length > 0) {
+              handleIncomingChapters(serverList);
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Direct GitHub Raw JSON fetch for resilient cross-device sync
+      fetchRawGithubJson<Record<string, Chapter[]>>('chapters.json')
+        .then((allChapters) => {
+          if (allChapters) {
+            const list = allChapters[storyId] || (aliasId ? allChapters[aliasId] : null);
+            if (Array.isArray(list) && list.length > 0) {
+              handleIncomingChapters(list);
+            }
           }
         })
         .catch(() => {});
-    }
+    };
 
-    // Direct GitHub Raw JSON fetch for resilient cross-device sync
-    fetchRawGithubJson<Record<string, Chapter[]>>('chapters.json')
-      .then((allChapters) => {
-        if (allChapters) {
-          const list = allChapters[storyId] || (aliasId ? allChapters[aliasId] : null);
-          if (Array.isArray(list) && list.length > 0) {
-            handleIncomingChapters(list);
-          }
-        }
-      })
-      .catch(() => {});
+    syncStoryChaptersRemote();
+    pollStoryChaptersInterval = setInterval(syncStoryChaptersRemote, 20000);
   }
 
   // 4. Connect to Firestore query on chapter_stats with auto-reconnect on quota reset
@@ -4247,16 +4258,12 @@ export const subscribeToStoryChapters = (
             }
           });
 
-          let finalChapters: Chapter[] = [];
+          // Merge cloud chapters with existing chapters from GitHub/base samples, never wiping out existing chapters!
+          const currentList = getStoryChapters(storyId);
+          const baseSamples = (SAMPLE_CHAPTERS[storyId] || (aliasId ? SAMPLE_CHAPTERS[aliasId] : []) || []);
+          const seedChapters = currentList.length > 0 ? currentList : baseSamples;
 
-          if (cloudChapters.length > 0) {
-            finalChapters = cloudChapters;
-          } else if (hasAnyDocForThisStory) {
-            finalChapters = [];
-          } else {
-            const baseSamples = (SAMPLE_CHAPTERS[storyId] || (aliasId ? SAMPLE_CHAPTERS[aliasId] : []) || []);
-            finalChapters = baseSamples.filter((ch) => !cloudDeletedChapterIds.has(ch.id));
-          }
+          let finalChapters = mergeChapters(seedChapters, cloudChapters).filter((ch) => !cloudDeletedChapterIds.has(ch.id));
 
           finalChapters.sort((a, b) => {
             const numA = Number(a.chapterNumber) || 0;
@@ -4297,6 +4304,7 @@ export const subscribeToStoryChapters = (
     if (aliasId) activeChapterSubscribers.get(aliasId)?.delete(callback);
     unsubReset();
     if (unsubFirestore) unsubFirestore();
+    if (pollStoryChaptersInterval) clearInterval(pollStoryChaptersInterval);
   };
 };
 
@@ -5660,6 +5668,88 @@ export const syncAllLocalToFirestore = async (): Promise<{
       announcementsCount,
       error: err?.message || 'Lỗi đồng bộ Firestore',
     };
+  }
+};
+
+/**
+ * Force clear local story & chapter caches and reload pristine data directly from GitHub & Server API.
+ * Guarantees readers immediately get the latest updates without needing to clear browser cookies/history.
+ */
+export const forceRefreshAllData = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    if (typeof window === 'undefined') return { success: true, count: 0 };
+
+    // 1. Clear cached items from localStorage
+    localStorage.removeItem('mel_published_stories');
+    localStorage.removeItem('mel_all_chapters_cache_v1');
+    localStorage.removeItem('mel_cloud_deleted_cache');
+    localStorage.removeItem('mel_announcements');
+    localStorage.removeItem('mel_published_announcements');
+
+    // Remove any per-story chapter cache keys
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('mel_chapters_') || key.startsWith('mel_comments_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    // 2. Fetch fresh JSON files from GitHub with cache-busting
+    const [freshStories, freshChapters, freshAnnouncements, freshStats] = await Promise.all([
+      fetchRawGithubJson<Story[]>('stories.json'),
+      fetchRawGithubJson<Record<string, Chapter[]>>('chapters.json'),
+      fetchRawGithubJson<Announcement[]>('announcements.json'),
+      fetchRawGithubJson<any>('stats.json'),
+    ]);
+
+    let loadedStoriesCount = 0;
+
+    // Apply fresh stories
+    if (Array.isArray(freshStories) && freshStories.length > 0) {
+      loadedStoriesCount = freshStories.length;
+      try {
+        localStorage.setItem('mel_published_stories', JSON.stringify(freshStories));
+      } catch {}
+      notifyStorySubscribers(freshStories);
+    }
+
+    // Apply fresh chapters
+    if (freshChapters && typeof freshChapters === 'object') {
+      for (const [sId, chList] of Object.entries(freshChapters)) {
+        if (Array.isArray(chList)) {
+          setLiveStoryChapters(sId, chList);
+          try {
+            localStorage.setItem(`mel_chapters_${sId}`, JSON.stringify(chList));
+          } catch {}
+          notifyChapterSubscribers(sId, chList);
+        }
+      }
+      notifyAllChaptersSubscribers(freshChapters);
+    }
+
+    // Apply fresh announcements
+    if (Array.isArray(freshAnnouncements) && freshAnnouncements.length > 0) {
+      saveStoredAnnouncements(freshAnnouncements);
+      notifyAnnouncementSubscribers(freshAnnouncements);
+    }
+
+    // Apply fresh stats
+    if (freshStats) {
+      const globalData = freshStats.global || freshStats;
+      notifyGlobalStatsSubscribers({
+        totalVisits: Number(globalData.totalVisits) || 0,
+        totalFollowers: Number(globalData.totalFollowers) || 0,
+        totalLikes: Number(globalData.totalLikes) || 0,
+        totalComments: Number(globalData.totalComments) || 0,
+      });
+    }
+
+    return { success: true, count: loadedStoriesCount };
+  } catch (err: any) {
+    console.error('Error during forceRefreshAllData:', err);
+    return { success: false, count: 0, error: err?.message || 'Lỗi làm mới dữ liệu' };
   }
 };
 
