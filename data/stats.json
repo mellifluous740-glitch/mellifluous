@@ -1,24 +1,24 @@
 {
-  "totalVisits": 53,
+  "totalVisits": 63,
   "totalFollowers": 3,
-  "totalLikes": 4,
+  "totalLikes": 6,
   "totalComments": 3,
   "global": {
-    "totalVisits": 53,
+    "totalVisits": 63,
     "totalFollowers": 3,
-    "totalLikes": 4
+    "totalLikes": 6
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
-      "views": 5,
-      "likes": 1,
+      "views": 15,
+      "likes": 2,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
     },
     "nang-luc-cua-man-em": {
-      "views": 5,
+      "views": 6,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -50,7 +50,7 @@
       "commentCount": 0
     },
     "khac-ten-anh-len-bia-mo-cua-em": {
-      "views": 9,
+      "views": 10,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -58,8 +58,8 @@
       "commentCount": 0
     },
     "huong-dan-lang-phi-tinh-yeu": {
-      "views": 1,
-      "likes": 3,
+      "views": 12,
+      "likes": 4,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-09-23T05:01:23.200Z"
+  "updatedAt": "2026-09-23T06:53:55.199Z"
 }
