@@ -609,6 +609,18 @@ export const AuthorSyncTab: React.FC<AuthorSyncTabProps> = ({ onFeedback, onRefr
 
         {/* Token Input */}
         <div className="space-y-1.5">
+          {!githubTokenInput.trim() && (
+            <div className="p-3 mb-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Thiết bị / Trình duyệt này chưa cấu hình GitHub Token!</p>
+                <p className="text-[11px] mt-0.5 text-amber-800 dark:text-amber-300">
+                  Để tự động đẩy chương/truyện lên GitHub hoặc ấn nút đẩy dữ liệu, mỗi cộng sự khi dùng máy tính/điện thoại của mình cần nhập GitHub Token vào ô bên dưới một lần và bấm <strong>"Lưu cấu hình GitHub"</strong>.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-pink-600" />

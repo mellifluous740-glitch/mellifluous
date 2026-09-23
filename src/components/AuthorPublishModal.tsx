@@ -384,7 +384,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
           showFeedback('error', `Đã lưu truyện thành công, nhưng đồng bộ GitHub gặp lỗi: ${pubResult.github.error}`);
         }
       } else {
-        showFeedback('success', `Đã xuất bản tác phẩm "${newStory.title}" thành công! Lượt xem bắt đầu từ 0.`);
+        showFeedback('success', `Đã lưu tác phẩm "${newStory.title}"! (Lưu ý: Thiết bị này chưa cài GitHub Token nên chưa thể tự động đẩy lên GitHub chung).`);
       }
 
       setStoryTitle('');
@@ -452,7 +452,7 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
           showFeedback('error', `Đã lưu chương thành công, nhưng đồng bộ GitHub gặp lỗi: ${pubResult.github.error}`);
         }
       } else {
-        showFeedback('success', `Đã đăng thành công "${newChapter.title}"!`);
+        showFeedback('success', `Đã lưu chương "${newChapter.title}"! (Lưu ý: Thiết bị này chưa cài GitHub Token nên chưa thể tự động đẩy lên GitHub chung).`);
       }
 
       setChapterTitle('');
