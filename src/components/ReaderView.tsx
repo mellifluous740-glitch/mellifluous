@@ -1156,7 +1156,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             data-reader-theme={themeKey}
             data-font-family={fontFamily}
             data-line-height={lineHeight}
-            className={`reader-prose space-y-5 sm:space-y-6 select-text transition-all duration-200 break-words ${
+            data-protected="true"
+            className={`reader-prose space-y-5 sm:space-y-6 select-none protected-content transition-all duration-200 break-words ${
               fontFamily === 'serif' ? 'reader-font-serif font-serif' : 'reader-font-sans font-sans'
             } ${lineHeight === 'loose' ? 'reader-line-loose leading-loose sm:leading-[2.2]' : 'reader-line-relaxed leading-relaxed sm:leading-[1.8]'} ${
               themeKey === 'dark' ? 'text-[#e4e4e7]' : currentTheme.textColor
@@ -1169,11 +1170,15 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             />
 
             {/* Ending note of chapter */}
-            <div className="pt-8 text-center space-y-1.5">
+            <div className="pt-8 text-center space-y-2 select-none">
               <span className="inline-block text-lg text-pink-400">❀ ❀ ❀</span>
               <p className={`text-xs font-serif italic ${currentTheme.subtextColor}`}>
                 Hết chương {chapter.chapterNumber} • Cảm ơn bạn đã đọc truyện tại better and better (Mellifluous)
               </p>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50/80 dark:bg-pink-950/40 border border-pink-200/60 dark:border-pink-900/50 text-[11px] font-sans font-medium text-pink-700 dark:text-pink-300 shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                <span>Bản dịch độc quyền của Mellifluous • Nghiêm cấm sao chép & reup trái phép</span>
+              </div>
             </div>
           </div>
         )}

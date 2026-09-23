@@ -20,6 +20,7 @@ import {
   Send,
   Reply,
   ShieldCheck,
+  Shield,
   LogOut,
   LogIn,
   Music,
@@ -49,6 +50,7 @@ import {
 import { RichTextEditor } from './common/RichTextEditor';
 import { RichTextRenderer } from './common/RichTextRenderer';
 import { getGithubConfig, saveGithubConfig, type GithubConfig } from '../lib/githubSyncService';
+import { getProtectionConfig, saveProtectionConfig, type ProtectionConfig } from '../lib/contentProtectionService';
 import { useAuth } from '../lib/authContext';
 import { AuthorMusicTab } from './author/AuthorMusicTab';
 import { AuthorEditStoryTab } from './author/AuthorEditStoryTab';
@@ -133,10 +135,12 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
 
   // GitHub AutoSync State
   const [ghConfig, setGhConfig] = useState<GithubConfig>(() => getGithubConfig());
+  const [protectionConfig, setProtectionConfig] = useState<ProtectionConfig>(() => getProtectionConfig());
 
   useEffect(() => {
     if (isOpen) {
       setGhConfig(getGithubConfig());
+      setProtectionConfig(getProtectionConfig());
     }
   }, [isOpen, activeTab]);
 
@@ -1670,6 +1674,109 @@ export const AuthorPublishModal: React.FC<AuthorPublishModalProps> = ({
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Đặt lại số liệu về 0</span>
                 </button>
+              </div>
+
+              {/* Anti-Theft & Content Protection Settings */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-rose-50/70 dark:bg-stone-800 border border-rose-200/80 dark:border-stone-700 shadow-2xs space-y-3.5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-rose-200/60 dark:border-stone-700 pb-3">
+                  <div>
+                    <h4 className="font-serif text-sm font-bold text-rose-900 dark:text-rose-200 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                      <span>Hệ thống Chống trộm & Bảo vệ bản quyền (Anti-Copy & Anti-Theft)</span>
+                    </h4>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 mt-0.5">
+                      Khóa nhấp chuột phải, chặn sao chép bôi đen, vô hiệu hóa phím tắt (Ctrl+C, Ctrl+U, F12) và nhúng thủy ấn vô hình chống bot cào truyện.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = saveProtectionConfig({ enabled: !protectionConfig.enabled });
+                      setProtectionConfig(updated);
+                      showFeedback('success', updated.enabled ? 'Đã kích hoạt toàn diện tính năng chống copy & trộm nội dung!' : 'Đã tạm tắt bảo vệ bản quyền.');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs ${
+                      protectionConfig.enabled
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                        : 'bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-200'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>{protectionConfig.enabled ? 'Đang Bật Toàn Diện' : 'Đang Tắt'}</span>
+                  </button>
+                </div>
+
+                {protectionConfig.enabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {/* Toggle Block Right-Click */}
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-stone-850 border border-rose-100 dark:border-stone-700 cursor-pointer hover:border-rose-300 transition-colors">
+                      <div className="text-xs">
+                        <span className="font-semibold text-stone-800 dark:text-stone-200 block">Chặn chuột phải (Context Menu)</span>
+                        <span className="text-[11px] text-stone-500 dark:text-stone-400">Khóa menu chuột phải khi người đọc nhấn vào truyện</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={protectionConfig.blockRightClick}
+                        onChange={(e) => {
+                          const updated = saveProtectionConfig({ blockRightClick: e.target.checked });
+                          setProtectionConfig(updated);
+                        }}
+                        className="w-4 h-4 text-rose-600 accent-rose-600 rounded cursor-pointer shrink-0 ml-2"
+                      />
+                    </label>
+
+                    {/* Toggle Block Copy & Shortcuts */}
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-stone-850 border border-rose-100 dark:border-stone-700 cursor-pointer hover:border-rose-300 transition-colors">
+                      <div className="text-xs">
+                        <span className="font-semibold text-stone-800 dark:text-stone-200 block">Chặn bôi đen & Phím tắt Copy</span>
+                        <span className="text-[11px] text-stone-500 dark:text-stone-400">Chặn Ctrl+C, Ctrl+A, F12, Ctrl+U (Xem mã nguồn)</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={protectionConfig.blockCopy}
+                        onChange={(e) => {
+                          const updated = saveProtectionConfig({ blockCopy: e.target.checked, blockShortcuts: e.target.checked });
+                          setProtectionConfig(updated);
+                        }}
+                        className="w-4 h-4 text-rose-600 accent-rose-600 rounded cursor-pointer shrink-0 ml-2"
+                      />
+                    </label>
+
+                    {/* Toggle Block Print / PDF */}
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-stone-850 border border-rose-100 dark:border-stone-700 cursor-pointer hover:border-rose-300 transition-colors">
+                      <div className="text-xs">
+                        <span className="font-semibold text-stone-800 dark:text-stone-200 block">Chặn in ấn & Xuất file PDF</span>
+                        <span className="text-[11px] text-stone-500 dark:text-stone-400">Khóa Ctrl+P và che mờ nội dung khi bị in trộm</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={protectionConfig.blockPrint}
+                        onChange={(e) => {
+                          const updated = saveProtectionConfig({ blockPrint: e.target.checked });
+                          setProtectionConfig(updated);
+                        }}
+                        className="w-4 h-4 text-rose-600 accent-rose-600 rounded cursor-pointer shrink-0 ml-2"
+                      />
+                    </label>
+
+                    {/* Toggle Anti-Bot Invisible Watermark */}
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-stone-850 border border-rose-100 dark:border-stone-700 cursor-pointer hover:border-rose-300 transition-colors">
+                      <div className="text-xs">
+                        <span className="font-semibold text-stone-800 dark:text-stone-200 block">Thủy ấn vô hình chống bot cào</span>
+                        <span className="text-[11px] text-stone-500 dark:text-stone-400">Tự động chèn ký hiệu bản quyền nếu bot reup tự động</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={protectionConfig.invisibleWatermark}
+                        onChange={(e) => {
+                          const updated = saveProtectionConfig({ invisibleWatermark: e.target.checked });
+                          setProtectionConfig(updated);
+                        }}
+                        className="w-4 h-4 text-rose-600 accent-rose-600 rounded cursor-pointer shrink-0 ml-2"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between">

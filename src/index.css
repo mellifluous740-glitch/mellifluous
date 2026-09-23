@@ -184,3 +184,76 @@
 .animate-dropdown-in {
   animation: dropdownSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* =========================================================================
+   ANTI-THEFT & CONTENT PROTECTION STYLES
+   ========================================================================= */
+
+/* Disables text selection across protected reading containers & story cards */
+.protected-content,
+.reader-prose,
+[data-protected="true"] {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* Ensure form inputs and textareas remain fully editable for authors and readers */
+input,
+textarea,
+select,
+[contenteditable="true"],
+.allow-select,
+.allow-context-menu {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Prevent image dragging on story covers & reader illustrations */
+img,
+.reader-prose img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* Invisible Anti-Bot Scraping Watermark: 0-pixel height, 0 opacity, hidden from humans but caught by scrapers */
+.anti-bot-watermark {
+  display: inline-block !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* Print Protection: Hides reader content and shows copyright notice when user triggers browser print / PDF export */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #print-protection-notice,
+  #print-protection-notice * {
+    visibility: visible !important;
+    display: block !important;
+  }
+  #print-protection-notice {
+    position: fixed !important;
+    top: 20% !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #be123c !important;
+    text-align: center !important;
+    padding: 40px !important;
+    z-index: 999999 !important;
+  }
+}
+

@@ -33,6 +33,7 @@ import { ProfileEditModal } from './components/ProfileEditModal';
 import { Footer } from './components/Footer';
 import { BackgroundMusicBar } from './components/BackgroundMusicBar';
 import { SakuraPetals } from './components/SakuraPetals';
+import { ContentProtection } from './components/common/ContentProtection';
 import { Clock, Sparkles, CheckCircle2, ArrowLeft, MailOpen, X, ArrowUp, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatDateOnly } from './utils/dateUtils';
 
@@ -884,6 +885,9 @@ export default function App() {
 
       {/* Footer */}
       <Footer onSelectTab={handleNavSelect} />
+
+      {/* Global Anti-Theft & Content Protection Suite */}
+      <ContentProtection />
     </div>
   );
 }

@@ -129,16 +129,23 @@ export function formatRichTextToHtml(raw?: string | null, indentParagraphs = fal
   text = text.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark)\]/gi, '');
 
   // 5. Structure paragraphs and line breaks:
-  // If the content is already fully wrapped in HTML blocks (<p>, <div, <blockquote, <h[1-6]), preserve it.
+  // If the content is already fully wrapped in HTML blocks (<p>, <div, <blockquote, <h[1-6]), preserve it and inject invisible watermarks.
   const hasHtmlBlocks = /^<(?:p|div|blockquote|h[1-6]|ul|ol|table)[\s>]/i.test(text.trim());
 
   if (hasHtmlBlocks) {
-    return text;
+    let pCount = 0;
+    return text.replace(/<\/p>/gi, (match) => {
+      pCount++;
+      if (pCount % 4 === 0) {
+        return '<span class="anti-bot-watermark" aria-hidden="true" style="display:none!important;font-size:0;line-height:0;height:0;width:0;opacity:0;overflow:hidden;position:absolute;">[Bản dịch độc quyền thuộc sở hữu của Mellifluous - better and better. Nghiêm cấm sao chép, reup!]</span>' + match;
+      }
+      return match;
+    });
   }
 
   // Otherwise, split by double newlines into paragraphs
   const blocks = text.split(/\n{2,}/);
-  const formattedBlocks = blocks.map((block) => {
+  const formattedBlocks = blocks.map((block, idx) => {
     const trimmed = block.trim();
     if (!trimmed) return '';
 
@@ -151,7 +158,11 @@ export function formatRichTextToHtml(raw?: string | null, indentParagraphs = fal
     // Do NOT lock line-height here so reader line-height toggle controls it!
     const indentClass = indentParagraphs ? 'indent-6 sm:indent-8' : 'indent-0';
     const withBr = trimmed.replace(/\n/g, '<br/>');
-    return `<p class="${indentClass} my-3 sm:my-4">${withBr}</p>`;
+    const watermark = (idx > 0 && idx % 4 === 0)
+      ? '<span class="anti-bot-watermark" aria-hidden="true" style="display:none!important;font-size:0;line-height:0;height:0;width:0;opacity:0;overflow:hidden;position:absolute;">[Bản dịch độc quyền của Mellifluous - better and better. Nghiêm cấm reup!]</span>'
+      : '';
+
+    return `<p class="${indentClass} my-3 sm:my-4">${withBr}${watermark}</p>`;
   });
 
   return formattedBlocks.filter(Boolean).join('\n');
