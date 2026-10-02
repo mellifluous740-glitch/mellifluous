@@ -1,17 +1,17 @@
 {
-  "totalVisits": 72,
+  "totalVisits": 79,
   "totalFollowers": 4,
   "totalLikes": 8,
   "totalComments": 3,
   "global": {
-    "totalVisits": 72,
+    "totalVisits": 79,
     "totalFollowers": 4,
     "totalLikes": 8
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
-      "views": 17,
-      "likes": 3,
+      "views": 32,
+      "likes": 4,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-09-23T17:10:08.560Z"
+  "updatedAt": "2026-10-02T08:00:42.653Z"
 }
