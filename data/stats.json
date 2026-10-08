@@ -10,7 +10,7 @@
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
-      "views": 42,
+      "views": 44,
       "likes": 5,
       "followers": 5,
       "ratingSum": 5,
@@ -58,7 +58,7 @@
       "commentCount": 0
     },
     "huong-dan-lang-phi-tinh-yeu": {
-      "views": 15,
+      "views": 16,
       "likes": 4,
       "followers": 2,
       "ratingSum": 0,
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-08T10:42:42.223Z"
+  "updatedAt": "2026-10-08T11:01:20.542Z"
 }
