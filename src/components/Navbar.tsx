@@ -223,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* =================================================================== */}
         <nav
           aria-label="Thanh điều hướng chính"
-          className="hidden xl:flex items-center justify-center gap-1.5 2xl:gap-2.5 flex-1 min-w-0 px-2"
+          className="hidden lg:flex items-center justify-center gap-1 xl:gap-2 2xl:gap-2.5 flex-1 min-w-0 px-1 xl:px-2"
         >
           {desktopNavItems.map((item) => {
             const isActive = currentTab === item.id;
@@ -261,24 +261,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* 3. ACTION CONTROLS (INTEGRATED AUTHOR & ACCOUNT MENU, UTILITIES)     */}
         {/* =================================================================== */}
         <div id="navbar-action-controls" className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Quick Reading List Button */}
-          <button
-            type="button"
-            id="navbar-reading-list-btn"
-            onClick={onOpenReadingList}
-            className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-800/80 hover:bg-pink-50 dark:hover:bg-stone-750 text-stone-700 dark:text-stone-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs relative"
-            title="Danh sách đọc & Tiến trình của bạn"
-            aria-label="Danh sách đọc"
-          >
-            <Library className="w-3.5 h-3.5 text-pink-500" />
-            <span className="hidden xl:inline">Danh sách đọc</span>
-            {readingListCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-pink-500 text-white font-mono text-[10px] font-bold">
-                {readingListCount}
-              </span>
-            )}
-          </button>
-
           {/* Realtime Notification Bell - Strictly for Logged-In Users */}
           {user && (
             <NotificationBell
@@ -301,7 +283,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'bg-stone-100/90 hover:bg-stone-200/90 dark:bg-stone-800 dark:hover:bg-stone-750 text-stone-800 dark:text-stone-200 border-stone-200 dark:border-stone-700'
                   : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white border-transparent'
               }`}
-              title="Menu Tác giả & Tài khoản"
+              title="Menu Tác giả, Tài khoản & Danh sách đọc"
               aria-expanded={isAuthorMenuOpen}
             >
               {user ? (
@@ -316,6 +298,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="font-serif truncate max-w-[85px] leading-none">
                     {isAuthor ? '🌸 Mel' : (user.displayName || 'Tài khoản')}
                   </span>
+                  {readingListCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-pink-500 text-white font-mono text-[9px] font-bold shrink-0 shadow-2xs" title={`Có ${readingListCount} truyện trong Danh sách đọc`}>
+                      {readingListCount}
+                    </span>
+                  )}
                   <ChevronDown
                     className={`w-3 h-3 text-stone-500 dark:text-stone-400 transition-transform duration-200 ${
                       isAuthorMenuOpen ? 'rotate-180' : ''
@@ -326,6 +313,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <>
                   <UserIcon className="w-3.5 h-3.5" />
                   <span className="inline font-medium leading-none">Tài khoản</span>
+                  {readingListCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-white text-pink-600 font-mono text-[9px] font-bold shrink-0 shadow-2xs" title={`Có ${readingListCount} truyện trong Danh sách đọc`}>
+                      {readingListCount}
+                    </span>
+                  )}
                   <ChevronDown
                     className={`w-3 h-3 transition-transform duration-200 ${
                       isAuthorMenuOpen ? 'rotate-180' : ''
@@ -372,6 +364,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Reading List Option in Dropdown - Prominently featured for all readers */}
+                <button
+                  type="button"
+                  id="navbar-user-reading-list-item"
+                  onClick={() => {
+                    setIsAuthorMenuOpen(false);
+                    if (onOpenReadingList) onOpenReadingList();
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-2.5 transition-colors cursor-pointer group border border-pink-100 dark:border-pink-900/40 bg-pink-50/40 dark:bg-pink-950/20"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Library className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold flex items-center justify-between text-pink-850 dark:text-pink-200">
+                      <span>Danh sách đọc & Tiến trình</span>
+                      {readingListCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-pink-500 text-white font-mono text-[10px] font-bold">
+                          {readingListCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                      Các tác phẩm đã lưu & chương đang đọc dở
+                    </div>
+                  </div>
+                </button>
 
                 {/* Author Studio Option (Integrated Branch) */}
                 {isAuthor && onOpenAuthorModal && (
@@ -428,34 +448,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   </button>
                 )}
-
-                {/* Reading List Option in Dropdown */}
-                <button
-                  type="button"
-                  id="navbar-user-reading-list-item"
-                  onClick={() => {
-                    setIsAuthorMenuOpen(false);
-                    if (onOpenReadingList) onOpenReadingList();
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-2.5 transition-colors cursor-pointer group"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Library className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold flex items-center justify-between">
-                      <span>Danh sách đọc & Tiến trình</span>
-                      {readingListCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 font-mono text-[10px] font-bold">
-                          {readingListCount}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                      Các tác phẩm đã lưu & chương đang đọc dở
-                    </div>
-                  </div>
-                </button>
 
                 {/* Edit Profile Option (Avatar, Nickname, Bio) */}
                 {user && (
