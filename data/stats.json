@@ -12,9 +12,9 @@
     "chanh-xanh-cuong-tuong": {
       "views": 45,
       "likes": 5,
-      "followers": 0,
-      "ratingSum": 0,
-      "ratingCount": 0,
+      "followers": 5,
+      "ratingSum": 5,
+      "ratingCount": 1,
       "commentCount": 0
     },
     "nang-luc-cua-man-em": {
@@ -55,12 +55,12 @@
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
-      "commentCount": 0
+      "commentCount": 1
     },
     "huong-dan-lang-phi-tinh-yeu": {
       "views": 19,
       "likes": 4,
-      "followers": 0,
+      "followers": 3,
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-08T18:09:32.354Z"
+  "updatedAt": "2026-10-08T18:35:10.013Z"
 }
