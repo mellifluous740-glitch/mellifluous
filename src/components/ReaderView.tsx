@@ -13,6 +13,13 @@ import {
   toggleStoryLike,
   recordStoryView,
 } from '../lib/realtimeService';
+import {
+  isStoryInReadingList,
+  addToReadingList,
+  removeFromReadingList,
+  updateReadingProgress,
+  subscribeToReadingList,
+} from '../lib/readingListService';
 import { useAuth } from '../lib/authContext';
 import {
   formatDateTime,
@@ -44,6 +51,9 @@ import {
   ArrowUp,
   RotateCcw,
   BookMarked,
+  Bookmark,
+  BookmarkCheck,
+  Library,
   Clock,
   SunMedium,
   Moon,
@@ -253,6 +263,52 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [tocTab, setTocTab] = useState<'all' | 'main' | 'extra'>('all');
   const [readingProgress, setReadingProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Reading list state for reader
+  const [isInReadingList, setIsInReadingList] = useState<boolean>(() => {
+    return isStoryInReadingList(user?.uid || 'guest', story.id);
+  });
+  const [readingListToast, setReadingListToast] = useState<string | null>(null);
+
+  // Keep reading list status synced
+  useEffect(() => {
+    const currentUid = user?.uid || 'guest';
+    setIsInReadingList(isStoryInReadingList(currentUid, story.id));
+    const unsub = subscribeToReadingList(currentUid, (items) => {
+      setIsInReadingList(items.some((i) => i.storyId === story.id));
+    });
+    return () => unsub();
+  }, [user?.uid, story.id]);
+
+  // Record reading progress upon chapter open
+  useEffect(() => {
+    const currentUid = user?.uid || 'guest';
+    updateReadingProgress(currentUid, story, chapter, 0);
+  }, [story.id, chapter.id, user?.uid]);
+
+  // Debounced scroll progress update to personal reading list
+  const lastSavedProgressRef = useRef<number>(0);
+  useEffect(() => {
+    if (Math.abs(readingProgress - lastSavedProgressRef.current) >= 8 || readingProgress === 100) {
+      lastSavedProgressRef.current = readingProgress;
+      const currentUid = user?.uid || 'guest';
+      updateReadingProgress(currentUid, story, chapter, readingProgress);
+    }
+  }, [readingProgress, story.id, chapter.id, user?.uid]);
+
+  const handleToggleReadingList = async () => {
+    const currentUid = user?.uid || 'guest';
+    if (isInReadingList) {
+      await removeFromReadingList(currentUid, story.id);
+      setIsInReadingList(false);
+      setReadingListToast('Đã bỏ khỏi Danh sách đọc');
+    } else {
+      await addToReadingList(currentUid, story, chapter);
+      setIsInReadingList(true);
+      setReadingListToast('Đã lưu vào Danh sách đọc của bạn!');
+    }
+    setTimeout(() => setReadingListToast(null), 3000);
+  };
 
   // Chapter unlock & interaction state
   const [unlockedChapters, setUnlockedChapters] = useState<Record<string, boolean>>(() => {
@@ -808,6 +864,26 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                   <span>Văn án</span>
                 </button>
               )}
+
+              {/* Nút Lưu Danh sách đọc */}
+              <button
+                type="button"
+                onClick={handleToggleReadingList}
+                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border flex items-center gap-1 text-xs font-medium transition-all cursor-pointer shrink-0 ${
+                  isInReadingList
+                    ? 'bg-rose-50 border-rose-300 text-rose-600 dark:bg-rose-950/60 dark:border-rose-800 dark:text-rose-300'
+                    : `${currentTheme.secondaryBtnBg} ${currentTheme.textColor} ${currentTheme.cardBorder}`
+                }`}
+                title={isInReadingList ? 'Đã lưu trong Danh sách đọc (Bấm để bỏ lưu)' : 'Lưu vào Danh sách đọc & Tiến trình của bạn'}
+                aria-label="Danh sách đọc"
+              >
+                {isInReadingList ? (
+                  <BookmarkCheck className="w-4 h-4 text-rose-500 shrink-0" />
+                ) : (
+                  <Bookmark className="w-4 h-4 text-pink-500 shrink-0" />
+                )}
+                <span className="hidden lg:inline">{isInReadingList ? 'Đã lưu tủ sách' : 'Lưu tủ sách'}</span>
+              </button>
 
               {/* Nút Bảo vệ mắt & Cỡ chữ */}
               <button
@@ -2063,6 +2139,14 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Reading List Toast Notification */}
+      {readingListToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 px-4 py-2.5 rounded-2xl bg-stone-900/95 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-medium shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none">
+          <Library className="w-4 h-4 text-pink-400 dark:text-pink-600 shrink-0" />
+          <span>{readingListToast}</span>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Story, Chapter, RealtimeComment } from '../types';
+import { Story, Chapter, RealtimeComment, ReadingProgressItem } from '../types';
 import { RichTextRenderer } from './common/RichTextRenderer';
 import {
   formatDateTime,
@@ -31,6 +31,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  Library,
+  ArrowRight,
 } from 'lucide-react';
 import {
   subscribeToStoryStats,
@@ -45,6 +47,13 @@ import {
   deleteComment,
   recordStoryView,
 } from '../lib/realtimeService';
+import {
+  isStoryInReadingList,
+  getStoryReadingProgress,
+  addToReadingList,
+  removeFromReadingList,
+  subscribeToReadingList,
+} from '../lib/readingListService';
 import { useAuth } from '../lib/authContext';
 
 
@@ -98,6 +107,28 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
   });
 
   const { user, isAuthor, isMainAuthor, isCollaborator, roleBadge, openAuthModal } = useAuth();
+
+  // Reading list & progress state
+  const [isInReadingList, setIsInReadingList] = useState<boolean>(() => {
+    return isStoryInReadingList(user?.uid || 'guest', story.id);
+  });
+  const [readingProgressItem, setReadingProgressItem] = useState<ReadingProgressItem | null>(() => {
+    return getStoryReadingProgress(user?.uid || 'guest', story.id);
+  });
+
+  // Keep reading list synced with user session & real-time updates
+  useEffect(() => {
+    const currentUid = user?.uid || 'guest';
+    setIsInReadingList(isStoryInReadingList(currentUid, story.id));
+    setReadingProgressItem(getStoryReadingProgress(currentUid, story.id));
+
+    const unsub = subscribeToReadingList(currentUid, (items) => {
+      const found = items.find((i) => i.storyId === story.id);
+      setIsInReadingList(Boolean(found));
+      setReadingProgressItem(found || null);
+    });
+    return () => unsub();
+  }, [user?.uid, story.id]);
 
   // Comments state
   const [comments, setComments] = useState<RealtimeComment[]>([]);
@@ -227,6 +258,38 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
       else localStorage.removeItem(`mel_followed_story_${story.id}`);
     } catch {}
     toggleStoryFollow(story.id, nextState);
+
+    // If reader follows, automatically add to personal reading list!
+    const currentUid = user?.uid || 'guest';
+    if (nextState && !isInReadingList) {
+      addToReadingList(currentUid, story, chapters[0] || null).then((item) => {
+        setIsInReadingList(true);
+        setReadingProgressItem(item);
+      });
+    }
+  };
+
+  const handleToggleReadingList = async () => {
+    const currentUid = user?.uid || 'guest';
+    if (isInReadingList) {
+      await removeFromReadingList(currentUid, story.id);
+      setIsInReadingList(false);
+      setReadingProgressItem(null);
+    } else {
+      const item = await addToReadingList(currentUid, story, chapters[0] || null);
+      setIsInReadingList(true);
+      setReadingProgressItem(item);
+
+      // Auto-follow if not already followed
+      if (!isFollowed) {
+        setIsFollowed(true);
+        setFollowersCount((prev) => prev + 1);
+        try {
+          localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
+        } catch {}
+        toggleStoryFollow(story.id, true);
+      }
+    }
   };
 
   const handleRating = (stars: number) => {
@@ -242,6 +305,24 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
       setRatingSum((s) => s - prevRating + stars);
     }
     submitStoryRating(story.id, stars);
+
+    // If reader hasn't followed yet, rating automatically marks them as following!
+    if (!isFollowed) {
+      setIsFollowed(true);
+      setFollowersCount((prev) => prev + 1);
+      try {
+        localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
+      } catch {}
+      toggleStoryFollow(story.id, true);
+
+      const currentUid = user?.uid || 'guest';
+      if (!isInReadingList) {
+        addToReadingList(currentUid, story, chapters[0] || null).then((item) => {
+          setIsInReadingList(true);
+          setReadingProgressItem(item);
+        });
+      }
+    }
   };
 
   const handleShare = () => {
@@ -455,6 +536,21 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
               </button>
             </div>
 
+            {/* Reading List Toggle Button */}
+            <button
+              type="button"
+              onClick={handleToggleReadingList}
+              className={`w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-medium transition-colors cursor-pointer shadow-2xs ${
+                isInReadingList
+                  ? 'bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/70 dark:border-rose-800 dark:text-rose-300'
+                  : 'bg-white dark:bg-stone-700 border-stone-200 dark:border-stone-600 text-stone-700 dark:text-stone-200 hover:border-pink-300 hover:bg-pink-50/50'
+              }`}
+              title="Lưu tác phẩm vào tủ sách cá nhân để theo dõi tiến trình đọc"
+            >
+              <Library className={`w-3.5 h-3.5 ${isInReadingList ? 'text-rose-600 dark:text-rose-400' : 'text-pink-500'}`} />
+              <span>{isInReadingList ? 'Đã trong Danh sách đọc' : 'Lưu vào Danh sách đọc'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleShare}
@@ -661,6 +757,53 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
                     className="text-xs text-pink-600 dark:text-pink-400 font-medium hover:underline pt-1 block cursor-pointer"
                   >
                     Xem cẩm nang giải pass chi tiết tại đây →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Personal Reading Progress Card */}
+            {readingProgressItem && (
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 dark:from-stone-900/90 dark:to-stone-850 border border-pink-200 dark:border-stone-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-stone-850 dark:text-stone-100 font-sans">
+                        Tiến trình đọc của bạn
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-950 text-pink-700 dark:text-pink-300 font-semibold font-sans">
+                        Trong danh sách đọc
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 mt-0.5">
+                      Đang đọc đến: <strong className="text-pink-600 dark:text-pink-400 font-bold">Chương {readingProgressItem.lastReadChapterNumber}</strong>
+                      {readingProgressItem.lastReadChapterTitle ? ` • ${readingProgressItem.lastReadChapterTitle}` : ''}
+                      {typeof readingProgressItem.scrollPercent === 'number' && readingProgressItem.scrollPercent > 0 ? (
+                        <span className="text-stone-500 dark:text-stone-400 ml-1">({readingProgressItem.scrollPercent}%)</span>
+                      ) : null}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onSelectChapter(readingProgressItem.lastReadChapterNumber || 1)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  >
+                    <span>Đọc tiếp Chương {readingProgressItem.lastReadChapterNumber || 1}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleReadingList}
+                    className="p-2 rounded-xl bg-white dark:bg-stone-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-stone-400 hover:text-rose-500 border border-stone-200 dark:border-stone-700 text-xs transition-colors cursor-pointer"
+                    title="Bỏ khỏi danh sách đọc"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

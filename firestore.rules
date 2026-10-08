@@ -105,5 +105,10 @@ service cloud.firestore {
     match /system_settings/{settingId} {
       allow read, write: if true;
     }
+
+    // Reader Reading List & Progress Tracking
+    match /reading_lists/{itemId} {
+      allow read, write: if true;
+    }
   }
 }

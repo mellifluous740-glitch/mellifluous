@@ -172,9 +172,34 @@
         "createdAt": { "type": "string" }
       },
       "required": ["title"]
+    },
+    "reading_lists": {
+      "title": "Reader Reading List & Progress",
+      "description": "Stories saved in reader's personal library and last read chapter progress",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "storyId": { "type": "string" },
+        "storyTitle": { "type": "string" },
+        "storyCover": { "type": "string" },
+        "storyAuthor": { "type": "string" },
+        "totalChapters": { "type": "number" },
+        "lastReadChapterId": { "type": "string" },
+        "lastReadChapterNumber": { "type": "number" },
+        "lastReadChapterTitle": { "type": "string" },
+        "scrollPercent": { "type": "number" },
+        "updatedAt": { "type": "string" },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["userId", "storyId", "storyTitle"]
     }
   },
   "firestore": {
+    "/reading_lists/{itemId}": {
+      "schema": "reading_lists",
+      "description": "Reader saved stories and reading progress bookmarks"
+    },
     "/site_stats/{statId}": {
       "schema": "site_stats",
       "description": "Global statistics like total visits and online users"

@@ -163,3 +163,19 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
+export interface ReadingProgressItem {
+  id: string;
+  userId: string;
+  storyId: string;
+  storyTitle: string;
+  storyCover?: string;
+  storyAuthor?: string;
+  totalChapters?: number;
+  lastReadChapterId?: string;
+  lastReadChapterNumber?: number;
+  lastReadChapterTitle?: string;
+  scrollPercent?: number;
+  updatedAt: string;
+  addedAt: string;
+}
+

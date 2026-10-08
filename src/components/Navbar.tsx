@@ -22,11 +22,13 @@ import {
   Edit3,
   Settings,
   MessageSquare,
+  Library,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 import { bgmEngine, AudioTrack, TRACK_LIST } from '../utils/audioPlayer';
 import { useAuth } from '../lib/authContext';
 import { NotificationBell } from './NotificationBell';
+import { getLocalReadingList, subscribeToReadingList } from '../lib/readingListService';
 
 interface NavbarProps {
   currentTab: ActiveTab;
@@ -38,6 +40,7 @@ interface NavbarProps {
   onTogglePetals: () => void;
   onOpenAuthorModal?: (tab?: string) => void;
   onNavigateToStory?: (storyId: string, chapterNumber?: number) => void;
+  onOpenReadingList?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,9 +53,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTogglePetals,
   onOpenAuthorModal,
   onNavigateToStory,
+  onOpenReadingList,
 }) => {
   const { user, isAuthor, isCollaborator, openAuthModal, openProfileModal, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [readingListCount, setReadingListCount] = useState<number>(() => {
+    return getLocalReadingList(user?.uid || 'guest').length;
+  });
+
+  useEffect(() => {
+    const currentUid = user?.uid || 'guest';
+    setReadingListCount(getLocalReadingList(currentUid).length);
+    const unsub = subscribeToReadingList(currentUid, (items) => {
+      setReadingListCount(items.length);
+    });
+    return () => unsub();
+  }, [user?.uid]);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<AudioTrack>(TRACK_LIST[0]);
   const [isAuthorMenuOpen, setIsAuthorMenuOpen] = useState(false);
@@ -245,6 +261,24 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* 3. ACTION CONTROLS (INTEGRATED AUTHOR & ACCOUNT MENU, UTILITIES)     */}
         {/* =================================================================== */}
         <div id="navbar-action-controls" className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Quick Reading List Button */}
+          <button
+            type="button"
+            id="navbar-reading-list-btn"
+            onClick={onOpenReadingList}
+            className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-800/80 hover:bg-pink-50 dark:hover:bg-stone-750 text-stone-700 dark:text-stone-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs relative"
+            title="Danh sách đọc & Tiến trình của bạn"
+            aria-label="Danh sách đọc"
+          >
+            <Library className="w-3.5 h-3.5 text-pink-500" />
+            <span className="hidden xl:inline">Danh sách đọc</span>
+            {readingListCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-pink-500 text-white font-mono text-[10px] font-bold">
+                {readingListCount}
+              </span>
+            )}
+          </button>
+
           {/* Realtime Notification Bell - Strictly for Logged-In Users */}
           {user && (
             <NotificationBell
@@ -394,6 +428,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   </button>
                 )}
+
+                {/* Reading List Option in Dropdown */}
+                <button
+                  type="button"
+                  id="navbar-user-reading-list-item"
+                  onClick={() => {
+                    setIsAuthorMenuOpen(false);
+                    if (onOpenReadingList) onOpenReadingList();
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-2.5 transition-colors cursor-pointer group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Library className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold flex items-center justify-between">
+                      <span>Danh sách đọc & Tiến trình</span>
+                      {readingListCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 font-mono text-[10px] font-bold">
+                          {readingListCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                      Các tác phẩm đã lưu & chương đang đọc dở
+                    </div>
+                  </div>
+                </button>
 
                 {/* Edit Profile Option (Avatar, Nickname, Bio) */}
                 {user && (
@@ -710,6 +772,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 </button>
               )}
+              {/* Reading List Shortcut in Mobile Drawer */}
+              <button
+                type="button"
+                id="mobile-drawer-reading-list-btn"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  if (onOpenReadingList) onOpenReadingList();
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-pink-50/80 dark:bg-pink-950/40 hover:bg-pink-100/80 border border-pink-200/80 dark:border-pink-900/60 text-pink-800 dark:text-pink-200 text-xs font-medium transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Library className="w-4 h-4 text-pink-500" />
+                  <span className="font-semibold">Danh sách đọc & Tiến trình</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-pink-500 text-white font-bold">
+                  {readingListCount}
+                </span>
+              </button>
             </div>
 
             {/* Quick Search Shortcut in Drawer */}

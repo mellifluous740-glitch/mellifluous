@@ -18,6 +18,7 @@ import { LetterNavCards, LetterTab } from './components/LetterNavCards';
 import { Sidebar } from './components/Sidebar';
 import { StoryCard } from './components/StoryCard';
 import { StoryModal } from './components/StoryModal';
+import { ReadingListModal } from './components/ReadingListModal';
 import { ReaderView } from './components/ReaderView';
 import { StoryDetailPage } from './components/StoryDetailPage';
 import { PasswordPage } from './components/PasswordPage';
@@ -100,6 +101,7 @@ export default function App() {
   });
 
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isReadingListOpen, setIsReadingListOpen] = useState<boolean>(false);
   const [isAuthorModalOpen, setIsAuthorModalOpen] = useState<boolean>(false);
   const [authorModalInitialTab, setAuthorModalInitialTab] = useState<string | undefined>('newStory');
   const [stories, setStories] = useState<Story[]>(() => sortStoriesByLatest(STORIES));
@@ -384,6 +386,7 @@ export default function App() {
         onTogglePetals={togglePetals}
         onOpenAuthorModal={handleOpenAuthorModal}
         onNavigateToStory={handleNavigateToStory}
+        onOpenReadingList={() => setIsReadingListOpen(true)}
       />
 
       {/* Main Content Area with top padding to clear fixed navbar */}
@@ -849,6 +852,25 @@ export default function App() {
         onGoToPasswordGuide={() => {
           setModalStoryId(null);
           handleNavSelect('password');
+        }}
+      />
+
+      {/* Reader Reading List & Progress Tracking Modal */}
+      <ReadingListModal
+        isOpen={isReadingListOpen}
+        onClose={() => setIsReadingListOpen(false)}
+        stories={stories}
+        onSelectStoryChapter={(targetStory, chapterNumber) => {
+          setIsReadingListOpen(false);
+          if (chapterNumber && chapterNumber > 0) {
+            handleOpenChapter(targetStory.id, chapterNumber);
+          } else {
+            handleOpenStoryModal(targetStory.id);
+          }
+        }}
+        onOpenStoryDetail={(targetStory) => {
+          setIsReadingListOpen(false);
+          handleNavigateToStory(targetStory.id);
         }}
       />
 

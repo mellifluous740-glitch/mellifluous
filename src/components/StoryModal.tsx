@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Story, Chapter } from '../types';
+import { Story, Chapter, ReadingProgressItem } from '../types';
 import { getStoryChapters } from '../data/mockData';
 import { RichTextRenderer } from './common/RichTextRenderer';
 import {
@@ -14,16 +14,28 @@ import {
   Lock,
   ArrowRight,
   Bookmark,
+  BookmarkCheck,
   Flower2,
   Star,
+  Library,
+  Trash2,
 } from 'lucide-react';
 import {
   subscribeToStoryStats,
   subscribeToStoryChapters,
   toggleStoryLike,
   toggleStoryFollow,
+  submitStoryRating,
   recordStoryView,
 } from '../lib/realtimeService';
+import {
+  isStoryInReadingList,
+  getStoryReadingProgress,
+  addToReadingList,
+  removeFromReadingList,
+  subscribeToReadingList,
+} from '../lib/readingListService';
+import { useAuth } from '../lib/authContext';
 import {
   formatDateTime,
   formatDateOnly,
@@ -55,7 +67,28 @@ export const StoryModal: React.FC<StoryModalProps> = ({
 
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [isFollowed, setIsFollowed] = useState<boolean>(false);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [hoverRating, setHoverRating] = useState<number>(0);
   const [liveChapters, setLiveChapters] = useState<Chapter[]>(() => story ? getStoryChapters(story.id) : []);
+
+  const { user } = useAuth();
+  const [isInReadingList, setIsInReadingList] = useState<boolean>(false);
+  const [readingProgressItem, setReadingProgressItem] = useState<ReadingProgressItem | null>(null);
+
+  // Subscribe to reading list
+  useEffect(() => {
+    if (!story || !isOpen) return;
+    const currentUid = user?.uid || 'guest';
+    setIsInReadingList(isStoryInReadingList(currentUid, story.id));
+    setReadingProgressItem(getStoryReadingProgress(currentUid, story.id));
+
+    const unsub = subscribeToReadingList(currentUid, (items) => {
+      const found = items.find((i) => i.storyId === story.id);
+      setIsInReadingList(Boolean(found));
+      setReadingProgressItem(found || null);
+    });
+    return () => unsub();
+  }, [user?.uid, story?.id, isOpen]);
 
   // Reset tab and sync storage when story changes
   useEffect(() => {
@@ -66,6 +99,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
       try {
         setIsLiked(localStorage.getItem(`mel_liked_story_${story.id}`) === 'true');
         setIsFollowed(localStorage.getItem(`mel_followed_story_${story.id}`) === 'true');
+        setUserRating(Number(localStorage.getItem(`mel_rated_story_${story.id}`)) || 0);
       } catch {}
     }
   }, [story?.id]);
@@ -157,6 +191,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
   };
 
   const handleToggleFollow = () => {
+    if (!story) return;
     const nextState = !isFollowed;
     setIsFollowed(nextState);
     setLiveFollowers((prev) => Math.max(0, prev + (nextState ? 1 : -1)));
@@ -165,6 +200,63 @@ export const StoryModal: React.FC<StoryModalProps> = ({
       else localStorage.removeItem(`mel_followed_story_${story.id}`);
     } catch {}
     toggleStoryFollow(story.id, nextState);
+
+    const currentUid = user?.uid || 'guest';
+    if (nextState && !isInReadingList) {
+      addToReadingList(currentUid, story, chapters[0] || null).then((item) => {
+        setIsInReadingList(true);
+        setReadingProgressItem(item);
+      });
+    }
+  };
+
+  const handleToggleReadingList = async () => {
+    if (!story) return;
+    const currentUid = user?.uid || 'guest';
+    if (isInReadingList) {
+      await removeFromReadingList(currentUid, story.id);
+      setIsInReadingList(false);
+      setReadingProgressItem(null);
+    } else {
+      const item = await addToReadingList(currentUid, story, chapters[0] || null);
+      setIsInReadingList(true);
+      setReadingProgressItem(item);
+      if (!isFollowed) {
+        setIsFollowed(true);
+        setLiveFollowers((prev) => prev + 1);
+        try {
+          localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
+        } catch {}
+        toggleStoryFollow(story.id, true);
+      }
+    }
+  };
+
+  const handleRating = (stars: number) => {
+    if (!story) return;
+    setUserRating(stars);
+    try {
+      localStorage.setItem(`mel_rated_story_${story.id}`, String(stars));
+    } catch {}
+    submitStoryRating(story.id, stars);
+
+    // If reader hasn't followed yet, rating automatically follows the story!
+    if (!isFollowed) {
+      setIsFollowed(true);
+      setLiveFollowers((prev) => prev + 1);
+      try {
+        localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
+      } catch {}
+      toggleStoryFollow(story.id, true);
+
+      const currentUid = user?.uid || 'guest';
+      if (!isInReadingList) {
+        addToReadingList(currentUid, story, chapters[0] || null).then((item) => {
+          setIsInReadingList(true);
+          setReadingProgressItem(item);
+        });
+      }
+    }
   };
 
   return (
@@ -267,10 +359,25 @@ export const StoryModal: React.FC<StoryModalProps> = ({
                       : 'bg-stone-50 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-amber-50'
                   }`}
                 >
-                  <Bookmark className="w-3.5 h-3.5" />
+                  {isFollowed ? <BookmarkCheck className="w-3.5 h-3.5 text-amber-600" /> : <Bookmark className="w-3.5 h-3.5" />}
                   <span>{isFollowed ? 'Đã theo dõi' : 'Theo dõi'}</span>
                 </button>
               </div>
+
+              {/* Toggle Reading List Button */}
+              <button
+                type="button"
+                onClick={handleToggleReadingList}
+                className={`w-full py-1.5 px-2.5 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-medium transition-all cursor-pointer shadow-2xs ${
+                  isInReadingList
+                    ? 'bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/70 dark:border-rose-800 dark:text-rose-300'
+                    : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-pink-50/50 hover:border-pink-300'
+                }`}
+                title="Lưu truyện vào Danh sách đọc cá nhân"
+              >
+                <Library className={`w-3.5 h-3.5 ${isInReadingList ? 'text-rose-600 dark:text-rose-400' : 'text-pink-500'}`} />
+                <span>{isInReadingList ? 'Đã trong Danh sách đọc' : 'Lưu Danh sách đọc'}</span>
+              </button>
             </div>
 
             {/* Story Details */}
@@ -298,7 +405,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
               </div>
 
               {/* Realtime Stats Table */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 border-y border-pink-100 dark:border-stone-800 text-xs sm:text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 py-3 border-y border-pink-100 dark:border-stone-800 text-xs sm:text-sm">
                 <div>
                   <span className="text-stone-400 dark:text-stone-500 block text-[11px]">Tác giả</span>
                   <strong className="text-stone-800 dark:text-stone-200">{story.author}</strong>
@@ -322,19 +429,111 @@ export const StoryModal: React.FC<StoryModalProps> = ({
                     <span>{liveViews.toLocaleString()}</span>
                     <span className="text-pink-500 font-bold">♥ {liveLikes.toLocaleString()}</span>
                   </strong>
+                  <span className="text-[10px] text-stone-400 block font-mono">
+                    {liveViews > 0 ? 'Đang có bạn đọc' : 'Chờ bạn đọc'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-stone-400 dark:text-stone-500 block text-[11px]">Người theo dõi</span>
+                  <strong className="text-amber-700 dark:text-amber-300 font-mono font-bold block">
+                    {liveFollowers.toLocaleString()}
+                  </strong>
+                  <span className="text-[10px] text-stone-400">Đã lưu tủ sách</span>
+                </div>
+              </div>
+
+              {/* Interactive Rating Row */}
+              <div className="p-3 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-serif text-xs font-semibold text-stone-800 dark:text-stone-200">
+                    Đánh giá tác phẩm:
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => handleRating(star)}
+                        className="p-0.5 text-amber-400 hover:scale-125 transition-transform cursor-pointer"
+                        title={`Đánh giá ${star} sao`}
+                      >
+                        <Star
+                          className={`w-4 h-4 ${
+                            (hoverRating || userRating || (ratingCount > 0 ? Math.round(Number(ratingAvg)) : 0)) >= star
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-stone-300 dark:text-stone-600'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
                   {ratingCount > 0 ? (
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-mono">
-                      <Star className="w-3 h-3 fill-amber-400" />
+                    <span className="font-mono font-bold text-xs text-amber-800 dark:text-amber-300 ml-1">
                       {ratingAvg}/5 ({ratingCount} vote)
                     </span>
                   ) : (
-                    <span className="text-[10px] text-stone-400 dark:text-stone-500 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-400" />
-                      Mới đăng
+                    <span className="text-[11px] text-stone-500 dark:text-stone-400 ml-1">
+                      (Chưa có vote • Hãy là người đầu tiên đánh giá nhé!)
                     </span>
                   )}
                 </div>
+
+                {userRating > 0 && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    ✓ Bạn đã vote {userRating} sao!
+                  </span>
+                )}
               </div>
+
+              {/* Personal Reading Progress Card */}
+              {readingProgressItem && (
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 dark:from-stone-850 dark:to-stone-900 border border-pink-200/80 dark:border-stone-750 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-stone-850 dark:text-stone-100 font-sans">
+                          Tiến trình đọc:
+                        </span>
+                        <span className="text-xs font-semibold text-pink-600 dark:text-pink-400">
+                          Chương {readingProgressItem.lastReadChapterNumber}
+                        </span>
+                        {typeof readingProgressItem.scrollPercent === 'number' && readingProgressItem.scrollPercent > 0 ? (
+                          <span className="text-[10px] text-stone-500 dark:text-stone-400">({readingProgressItem.scrollPercent}%)</span>
+                        ) : null}
+                      </div>
+                      {readingProgressItem.lastReadChapterTitle && (
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate max-w-xs">
+                          {readingProgressItem.lastReadChapterTitle}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onSelectChapter(story.id, readingProgressItem.lastReadChapterNumber || 1)}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-semibold flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <span>Đọc tiếp C.{readingProgressItem.lastReadChapterNumber || 1}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleReadingList}
+                      className="p-1.5 rounded-xl bg-white dark:bg-stone-800 hover:bg-rose-50 text-stone-400 hover:text-rose-500 border border-stone-200 dark:border-stone-700 text-xs transition-colors cursor-pointer"
+                      title="Bỏ khỏi danh sách đọc"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               {chapters.length > 0 ? (

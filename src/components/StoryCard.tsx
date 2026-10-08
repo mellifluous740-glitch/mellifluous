@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Story } from '../types';
-import { BookOpen, Eye, Heart, Sparkles, Key, CheckCircle, Clock, Star, Share2 } from 'lucide-react';
+import { BookOpen, Eye, Heart, Sparkles, Key, CheckCircle, Clock, Star, Share2, Bookmark } from 'lucide-react';
 import { getStoryChapters } from '../data/mockData';
 import { subscribeToStoryStats, subscribeToStoryChapters, toggleStoryLike, recordStoryView } from '../lib/realtimeService';
 import { stripRichText } from './common/RichTextRenderer';
@@ -19,6 +19,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
 
   const [realtimeViews, setRealtimeViews] = useState<number>(story.views || 0);
   const [realtimeLikes, setRealtimeLikes] = useState<number>(story.likes || 0);
+  const [followersCount, setFollowersCount] = useState<number>(0);
   const [ratingAvg, setRatingAvg] = useState<string>('0');
   const [ratingCount, setRatingCount] = useState<number>(0);
   const [publishedCount, setPublishedCount] = useState<number>(() => {
@@ -48,6 +49,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
       (liveStats) => {
         setRealtimeViews(liveStats.views);
         setRealtimeLikes(liveStats.likes);
+        setFollowersCount(liveStats.followers || 0);
         if (liveStats.ratingCount > 0) {
           setRatingAvg((liveStats.ratingSum / liveStats.ratingCount).toFixed(1));
           setRatingCount(liveStats.ratingCount);
@@ -186,6 +188,13 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onOpenStory, onSele
             <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-pink-500 text-pink-500' : 'text-pink-300'}`} />
             {realtimeLikes.toLocaleString()}
           </button>
+
+          {followersCount > 0 && (
+            <span className="flex items-center gap-0.5 text-amber-300 font-mono" title={`${followersCount} người đã theo dõi truyện`}>
+              <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>{followersCount.toLocaleString()}</span>
+            </span>
+          )}
 
           {ratingCount > 0 ? (
             <span className="flex items-center gap-0.5 text-amber-300 font-mono" title={`Đánh giá: ${ratingAvg}/5 (${ratingCount} lượt)`}>

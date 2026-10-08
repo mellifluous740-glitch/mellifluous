@@ -216,6 +216,10 @@ export const checkAndHandleQuotaError = (err: any): boolean => {
   return false;
 };
 
+// Aliases for unified quota protection across services
+export const checkIsFirestoreBlocked = (): boolean => isFirestoreQuotaExhausted();
+export const flagFirestoreQuotaExceeded = (err?: any): boolean => checkAndHandleQuotaError(err);
+
 // Resilient getDoc wrapper: prevents exceptions from crashing the app
 export const getDoc = async (docRef: DocumentReference<DocumentData>): Promise<any> => {
   if (isFirestoreQuotaExhausted()) {

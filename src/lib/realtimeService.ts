@@ -334,9 +334,15 @@ export const getStoredAllStoryStats = (): Record<string, StoryRealtimeStats> => 
             if (!result[id]) {
               result[id] = s as StoryRealtimeStats;
             } else {
-              result[id].views = Math.max(result[id].views, (s as any).views || 0);
-              result[id].likes = Math.max(result[id].likes, (s as any).likes || 0);
+              result[id].views = Math.max(result[id].views, Number((s as any).views) || 0);
+              result[id].likes = Math.max(result[id].likes, Number((s as any).likes) || 0);
+              result[id].followers = Math.max(result[id].followers || 0, Number((s as any).followers) || 0);
+              result[id].ratingSum = Math.max(result[id].ratingSum || 0, Number((s as any).ratingSum) || 0);
+              result[id].ratingCount = Math.max(result[id].ratingCount || 0, Number((s as any).ratingCount) || 0);
+              result[id].commentCount = Math.max(result[id].commentCount || 0, Number((s as any).commentCount) || 0);
             }
+            // Keep in-memory cache synchronized with restored stats
+            cachedStoryStatsMap.set(id, result[id]);
           }
         }
       }
@@ -451,12 +457,28 @@ export const calculateAggregateStoryFollowers = (): number => {
   return sum;
 };
 
-export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtimeStats) => {
-  cachedStoryStatsMap.set(storyId, { ...stats });
+export const notifyStoryStatsSubscribers = (storyId: string, stats: Partial<StoryRealtimeStats>) => {
+  const current = cachedStoryStatsMap.get(storyId) || {
+    views: 0,
+    likes: 0,
+    followers: 0,
+    ratingSum: 0,
+    ratingCount: 0,
+    commentCount: 0,
+  };
+  const merged: StoryRealtimeStats = {
+    views: typeof stats.views === 'number' ? Math.max(current.views, stats.views) : current.views,
+    likes: typeof stats.likes === 'number' ? Math.max(current.likes, stats.likes) : current.likes,
+    followers: typeof stats.followers === 'number' ? Math.max(0, stats.followers) : current.followers,
+    ratingSum: typeof stats.ratingSum === 'number' ? Math.max(current.ratingSum, stats.ratingSum) : current.ratingSum,
+    ratingCount: typeof stats.ratingCount === 'number' ? Math.max(current.ratingCount, stats.ratingCount) : current.ratingCount,
+    commentCount: typeof stats.commentCount === 'number' ? Math.max(current.commentCount, stats.commentCount) : current.commentCount,
+  };
+  cachedStoryStatsMap.set(storyId, merged);
   if (typeof window !== 'undefined') {
     try {
       const all = getStoredAllStoryStats();
-      all[storyId] = stats;
+      all[storyId] = merged;
       localStorage.setItem('mel_story_stats_cache', JSON.stringify(all));
     } catch {}
   }
@@ -464,7 +486,7 @@ export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtim
   if (set) {
     set.forEach((cb) => {
       try {
-        cb(stats);
+        cb(merged);
       } catch (e) {
         console.warn('Story stats subscriber error:', e);
       }
@@ -1806,10 +1828,11 @@ const startMasterStatsListener = () => {
               ratingCount: 0,
               commentCount: 0,
             };
+            const cloudFollowers = Number(st.followers) || 0;
             const updated: StoryRealtimeStats = {
               views: Math.max(current.views, Number(st.views) || 0),
               likes: Math.max(current.likes, Number(st.likes) || 0),
-              followers: Math.max(current.followers, Number(st.followers) || 0),
+              followers: cloudFollowers > 0 ? Math.max(current.followers, cloudFollowers) : current.followers,
               ratingSum: Math.max(current.ratingSum, Number(st.ratingSum) || 0),
               ratingCount: Math.max(current.ratingCount, Number(st.ratingCount) || 0),
               commentCount: Math.max(current.commentCount, Number(st.commentCount) || 0),
@@ -1886,11 +1909,32 @@ export const subscribeToStoryStats = (
               ...stats,
               views: Math.max(Number(stats.views) || 0, initialData.views, current?.views || 0),
               likes: Math.max(Number(stats.likes) || 0, initialData.likes, current?.likes || 0),
-              followers: Math.max(Number(stats.followers) || 0, current?.followers || 0),
+              followers: typeof stats.followers === 'number' ? stats.followers : Math.max(Number(stats.followers) || 0, current?.followers || 0),
               ratingSum: Math.max(Number(stats.ratingSum) || 0, current?.ratingSum || 0),
               ratingCount: Math.max(Number(stats.ratingCount) || 0, current?.ratingCount || 0),
               commentCount: Math.max(Number(stats.commentCount) || 0, current?.commentCount || 0),
             });
+          }
+        })
+        .catch(() => {});
+    } else {
+      // 1b. Pull latest stats from GitHub repository if no backend server available
+      fetchRawGithubJson<any>('stats.json')
+        .then((ghStats) => {
+          if (ghStats) {
+            const storiesMap = ghStats.stories && typeof ghStats.stories === 'object' ? extractStoryStatsFromCloudDoc(ghStats) : {};
+            const st = storiesMap[storyId];
+            if (st) {
+              const current = cachedStoryStatsMap.get(storyId);
+              notifyStoryStatsSubscribers(storyId, {
+                views: Math.max(current?.views || 0, st.views || 0),
+                likes: Math.max(current?.likes || 0, st.likes || 0),
+                followers: Math.max(current?.followers || 0, st.followers || 0),
+                ratingSum: Math.max(current?.ratingSum || 0, st.ratingSum || 0),
+                ratingCount: Math.max(current?.ratingCount || 0, st.ratingCount || 0),
+                commentCount: Math.max(current?.commentCount || 0, st.commentCount || 0),
+              });
+            }
           }
         })
         .catch(() => {});
@@ -2117,10 +2161,7 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
       .then((res) => (res && res.ok ? res.json() : null))
       .then((data) => {
         if (data?.stats) {
-          notifyStoryStatsSubscribers(storyId, {
-            ...currentStats,
-            ...data.stats,
-          });
+          notifyStoryStatsSubscribers(storyId, data.stats);
         }
         if (data?.globalStats) {
           notifyGlobalStatsSubscribers(data.globalStats);
@@ -2136,13 +2177,6 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
       setDoc(
         globalDocRef,
         {
-          stories: {
-            [storyId]: {
-              storyId,
-              followers: increment(delta),
-              updatedAt: new Date().toISOString(),
-            },
-          },
           [`stories.${storyId}.followers`]: increment(delta),
           [`stories.${storyId}.storyId`]: storyId,
           [`stories.${storyId}.updatedAt`]: new Date().toISOString(),
@@ -2201,10 +2235,7 @@ export const submitStoryRating = async (storyId: string, stars: number): Promise
       .then((res) => (res && res.ok ? res.json() : null))
       .then((data) => {
         if (data?.stats) {
-          notifyStoryStatsSubscribers(storyId, {
-            ...current,
-            ...data.stats,
-          });
+          notifyStoryStatsSubscribers(storyId, data.stats);
         }
         if (data?.globalStats) {
           notifyGlobalStatsSubscribers(data.globalStats);
@@ -2220,14 +2251,6 @@ export const submitStoryRating = async (storyId: string, stars: number): Promise
       setDoc(
         globalDocRef,
         {
-          stories: {
-            [storyId]: {
-              storyId,
-              ratingSum: increment(stars),
-              ratingCount: increment(1),
-              updatedAt: new Date().toISOString(),
-            },
-          },
           [`stories.${storyId}.ratingSum`]: increment(stars),
           [`stories.${storyId}.ratingCount`]: increment(1),
           [`stories.${storyId}.storyId`]: storyId,

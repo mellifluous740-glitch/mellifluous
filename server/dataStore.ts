@@ -931,6 +931,12 @@ const persistStatsSafe = () => {
   };
   writeJsonSafe(STATS_FILE, payload);
   try {
+    if (fs.existsSync(STATS_FILE)) {
+      const stat = fs.statSync(STATS_FILE);
+      lastStatsMtime = stat.mtimeMs;
+    }
+  } catch {}
+  try {
     const destDir = path.join(process.cwd(), 'public', 'data');
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
     fs.writeFileSync(path.join(destDir, 'stats.json'), JSON.stringify(payload, null, 2), 'utf-8');
@@ -1106,7 +1112,7 @@ export const toggleStoryFollow = (storyId: string, delta: number) => {
   const aggregateStoryFollowers = Object.values(cachedStats.stories).reduce((sum: number, s: any) => {
     return sum + (Number(s?.followers) || 0);
   }, 0);
-  cachedStats.global.totalFollowers = Math.max(aggregateStoryFollowers, (cachedStats.global.totalFollowers || 0) + delta);
+  cachedStats.global.totalFollowers = aggregateStoryFollowers;
   persistStatsSafe();
   return getStoryStats(storyId);
 };

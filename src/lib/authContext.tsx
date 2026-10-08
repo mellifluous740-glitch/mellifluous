@@ -13,6 +13,7 @@ import {
   User,
 } from './firebase';
 import { CollaboratorItem, UserProfile } from '../types';
+import { migrateGuestReadingList } from './readingListService';
 import {
   subscribeToCollaborators,
   addCollaborator,
@@ -260,6 +261,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           localStorage.setItem('mel_user_session', JSON.stringify(appUser));
         } catch {}
+
+        // Migrate any reading list items saved while browsing as guest
+        migrateGuestReadingList(fbUser.uid).catch(() => {});
 
         // Listen to profile updates
         profileUnsub = subscribeToUserProfile(fbUser.uid, (latestProfile) => {
