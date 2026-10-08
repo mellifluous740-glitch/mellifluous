@@ -1,10 +1,10 @@
 {
-  "totalVisits": 91,
+  "totalVisits": 93,
   "totalFollowers": 8,
   "totalLikes": 9,
   "totalComments": 3,
   "global": {
-    "totalVisits": 91,
+    "totalVisits": 93,
     "totalFollowers": 8,
     "totalLikes": 9
   },
@@ -18,7 +18,7 @@
       "commentCount": 0
     },
     "nang-luc-cua-man-em": {
-      "views": 6,
+      "views": 8,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -34,7 +34,7 @@
       "commentCount": 0
     },
     "tung-thanh": {
-      "views": 1,
+      "views": 2,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -50,12 +50,12 @@
       "commentCount": 0
     },
     "khac-ten-anh-len-bia-mo-cua-em": {
-      "views": 11,
+      "views": 13,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
       "ratingCount": 0,
-      "commentCount": 0
+      "commentCount": 1
     },
     "huong-dan-lang-phi-tinh-yeu": {
       "views": 16,
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-08T13:16:15.856Z"
+  "updatedAt": "2026-10-08T13:35:52.988Z"
 }
