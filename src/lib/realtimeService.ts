@@ -345,6 +345,56 @@ export const getStoredAllStoryStats = (): Record<string, StoryRealtimeStats> => 
   return result;
 };
 
+export const extractStoryStatsFromCloudDoc = (data: Record<string, any>): Record<string, StoryRealtimeStats> => {
+  const result: Record<string, StoryRealtimeStats> = {};
+  if (!data || typeof data !== 'object') return result;
+
+  // 1. Nested map format (if present)
+  if (data.stories && typeof data.stories === 'object') {
+    for (const [sId, st] of Object.entries(data.stories as Record<string, any>)) {
+      if (st && typeof st === 'object') {
+        result[sId] = {
+          views: Number(st.views) || 0,
+          likes: Number(st.likes) || 0,
+          followers: Number(st.followers) || 0,
+          ratingSum: Number(st.ratingSum) || 0,
+          ratingCount: Number(st.ratingCount) || 0,
+          commentCount: Number(st.commentCount) || 0,
+        };
+      }
+    }
+  }
+
+  // 2. Dotted flat format: data[`stories.${sId}.${field}`]
+  for (const [key, val] of Object.entries(data)) {
+    if (key.startsWith('stories.')) {
+      const parts = key.split('.');
+      if (parts.length >= 3) {
+        const sId = parts[1];
+        const field = parts.slice(2).join('.');
+        if (!result[sId]) {
+          result[sId] = {
+            views: 0,
+            likes: 0,
+            followers: 0,
+            ratingSum: 0,
+            ratingCount: 0,
+            commentCount: 0,
+          };
+        }
+        if (field === 'views') result[sId].views = Math.max(result[sId].views, Number(val) || 0);
+        else if (field === 'likes') result[sId].likes = Math.max(result[sId].likes, Number(val) || 0);
+        else if (field === 'followers') result[sId].followers = Math.max(result[sId].followers, Number(val) || 0);
+        else if (field === 'ratingSum') result[sId].ratingSum = Math.max(result[sId].ratingSum, Number(val) || 0);
+        else if (field === 'ratingCount') result[sId].ratingCount = Math.max(result[sId].ratingCount, Number(val) || 0);
+        else if (field === 'commentCount') result[sId].commentCount = Math.max(result[sId].commentCount, Number(val) || 0);
+      }
+    }
+  }
+
+  return result;
+};
+
 export const calculateAggregateStoryLikes = (): number => {
   let sum = 0;
   try {
@@ -374,6 +424,33 @@ export const calculateAggregateStoryLikes = (): number => {
   return sum;
 };
 
+export const calculateAggregateStoryFollowers = (): number => {
+  let sum = 0;
+  try {
+    const stories = getStoredStories();
+    const allStats = getStoredAllStoryStats();
+    const seenIds = new Set<string>();
+
+    if (Array.isArray(stories)) {
+      stories.forEach((s) => {
+        if (!s || !s.id || isStoryDeleted(s.id)) return;
+        seenIds.add(s.id);
+        const cachedFollowers = Math.max(0, Number(cachedStoryStatsMap.get(s.id)?.followers) || 0);
+        const allStatFollowers = allStats[s.id]?.followers !== undefined ? Math.max(0, Number(allStats[s.id].followers) || 0) : 0;
+        sum += Math.max(cachedFollowers, allStatFollowers);
+      });
+    }
+
+    cachedStoryStatsMap.forEach((stats, id) => {
+      if (!seenIds.has(id) && !isStoryDeleted(id)) {
+        sum += Math.max(0, Number(stats.followers) || 0);
+      }
+    });
+  } catch {}
+
+  return sum;
+};
+
 export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtimeStats) => {
   cachedStoryStatsMap.set(storyId, { ...stats });
   if (typeof window !== 'undefined') {
@@ -393,10 +470,12 @@ export const notifyStoryStatsSubscribers = (storyId: string, stats: StoryRealtim
       }
     });
   }
-  // Automatically recalculate aggregate likes across all stories and notify global stats
+  // Automatically recalculate aggregate likes and followers across all stories and notify global stats
   const aggLikes = calculateAggregateStoryLikes();
+  const aggFollowers = calculateAggregateStoryFollowers();
   notifyGlobalStatsSubscribers({
     totalLikes: aggLikes,
+    totalFollowers: Math.max(cachedGlobalStats.totalFollowers || 0, aggFollowers),
   });
 };
 
@@ -439,7 +518,7 @@ let cachedGlobalStats: GlobalRealtimeStats = {
       ? Math.max(Number(defaultVisits), Number(localStorage.getItem('mel_site_visits') || '1'))
       : Number(defaultVisits),
   activeReaders: 1,
-  totalFollowers: Number(defaultFollowers),
+  totalFollowers: Math.max(Number(defaultFollowers), calculateAggregateStoryFollowers()),
   totalComments: Array.isArray(defaultCommentsJson) ? defaultCommentsJson.length : 0,
   totalLikes: Math.max(Number(defaultLikes), calculateAggregateStoryLikes()),
 };
@@ -455,10 +534,15 @@ export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStat
   const rawLikes = partial.totalLikes !== undefined ? Number(partial.totalLikes) : (cachedGlobalStats.totalLikes || 0);
   const effectiveLikes = Math.max(rawLikes, aggLikes);
 
+  const aggFollowers = calculateAggregateStoryFollowers();
+  const rawFollowers = partial.totalFollowers !== undefined ? Number(partial.totalFollowers) : (cachedGlobalStats.totalFollowers || 0);
+  const effectiveFollowers = Math.max(rawFollowers, aggFollowers);
+
   cachedGlobalStats = {
     ...cachedGlobalStats,
     ...partial,
     totalLikes: effectiveLikes,
+    totalFollowers: effectiveFollowers,
     activeReaders: safeActive,
   };
   if (typeof window !== 'undefined' && cachedGlobalStats.totalVisits) {
@@ -477,7 +561,9 @@ export const notifyGlobalStatsSubscribers = (partial: Partial<GlobalRealtimeStat
 
 export const getGlobalStats = (): GlobalRealtimeStats => {
   const aggLikes = calculateAggregateStoryLikes();
+  const aggFollowers = calculateAggregateStoryFollowers();
   cachedGlobalStats.totalLikes = Math.max(cachedGlobalStats.totalLikes || 0, aggLikes);
+  cachedGlobalStats.totalFollowers = Math.max(cachedGlobalStats.totalFollowers || 0, aggFollowers);
   return { ...cachedGlobalStats };
 };
 
@@ -1630,28 +1716,32 @@ export const subscribeToGlobalStats = (
         if (ghStats) {
           const globalData = ghStats.global || ghStats;
           const currentAgg = calculateAggregateStoryLikes();
+          const currentAggFollowers = calculateAggregateStoryFollowers();
           notifyGlobalStatsSubscribers({
             totalVisits: Math.max(cachedGlobalStats.totalVisits, Number(globalData.totalVisits) || 1),
-            totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0),
+            totalFollowers: Math.max(cachedGlobalStats.totalFollowers, Number(globalData.totalFollowers) || 0, currentAggFollowers),
             totalLikes: Math.max(Number(globalData.totalLikes) || 0, currentAgg),
             totalComments: Math.max(cachedGlobalStats.totalComments, Number(globalData.totalComments) || 0),
           });
-          if (ghStats.stories && typeof ghStats.stories === 'object') {
-            for (const [sId, st] of Object.entries(ghStats.stories as Record<string, any>)) {
-              const current = cachedStoryStatsMap.get(sId) || {
-                views: 0,
-                likes: 0,
-                followers: 0,
-                ratingSum: 0,
-                ratingCount: 0,
-                commentCount: 0,
-              };
-              notifyStoryStatsSubscribers(sId, {
-                ...current,
-                views: Math.max(current.views, Number(st.views) || 0),
-                likes: Math.max(current.likes, Number(st.likes) || 0),
-              });
-            }
+          const storiesMap = ghStats.stories && typeof ghStats.stories === 'object' ? extractStoryStatsFromCloudDoc(ghStats) : {};
+          for (const [sId, st] of Object.entries(storiesMap)) {
+            const current = cachedStoryStatsMap.get(sId) || {
+              views: 0,
+              likes: 0,
+              followers: 0,
+              ratingSum: 0,
+              ratingCount: 0,
+              commentCount: 0,
+            };
+            notifyStoryStatsSubscribers(sId, {
+              ...current,
+              views: Math.max(current.views, Number(st.views) || 0),
+              likes: Math.max(current.likes, Number(st.likes) || 0),
+              followers: Math.max(current.followers, Number(st.followers) || 0),
+              ratingSum: Math.max(current.ratingSum, Number(st.ratingSum) || 0),
+              ratingCount: Math.max(current.ratingCount, Number(st.ratingCount) || 0),
+              commentCount: Math.max(current.commentCount, Number(st.commentCount) || 0),
+            });
           }
         }
       })
@@ -1691,8 +1781,9 @@ const startMasterStatsListener = () => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           const currentAgg = calculateAggregateStoryLikes();
+          const currentAggFollowers = calculateAggregateStoryFollowers();
           const totalVisits = Math.max(cachedGlobalStats.totalVisits, Number(data.totalVisits) || 1);
-          const totalFollowers = Math.max(cachedGlobalStats.totalFollowers, Number(data.totalFollowers) || 0);
+          const totalFollowers = Math.max(cachedGlobalStats.totalFollowers, Number(data.totalFollowers) || 0, currentAggFollowers);
           const totalComments = Math.max(cachedGlobalStats.totalComments, Number(data.totalComments) || 0);
           const rawLikes = Number(data.totalLikes);
           const totalLikes = !isNaN(rawLikes) ? Math.max(rawLikes, currentAgg) : currentAgg;
@@ -1705,29 +1796,26 @@ const startMasterStatsListener = () => {
           });
 
           // Unpack consolidated per-story metrics from the EXACT same document!
-          if (data.stories && typeof data.stories === 'object') {
-            for (const [sId, st] of Object.entries(data.stories as Record<string, any>)) {
-              if (st && typeof st === 'object') {
-                const current = cachedStoryStatsMap.get(sId) || {
-                  views: 0,
-                  likes: 0,
-                  followers: 0,
-                  ratingSum: 0,
-                  ratingCount: 0,
-                  commentCount: 0,
-                };
-                const updated: StoryRealtimeStats = {
-                  views: Math.max(current.views, Number(st.views) || 0),
-                  likes: Math.max(current.likes, Number(st.likes) || 0),
-                  followers: Math.max(current.followers, Number(st.followers) || 0),
-                  ratingSum: Math.max(current.ratingSum, Number(st.ratingSum) || 0),
-                  ratingCount: Math.max(current.ratingCount, Number(st.ratingCount) || 0),
-                  commentCount: Math.max(current.commentCount, Number(st.commentCount) || 0),
-                };
-                cachedStoryStatsMap.set(sId, updated);
-                notifyStoryStatsSubscribers(sId, updated);
-              }
-            }
+          const cloudStories = extractStoryStatsFromCloudDoc(data);
+          for (const [sId, st] of Object.entries(cloudStories)) {
+            const current = cachedStoryStatsMap.get(sId) || {
+              views: 0,
+              likes: 0,
+              followers: 0,
+              ratingSum: 0,
+              ratingCount: 0,
+              commentCount: 0,
+            };
+            const updated: StoryRealtimeStats = {
+              views: Math.max(current.views, Number(st.views) || 0),
+              likes: Math.max(current.likes, Number(st.likes) || 0),
+              followers: Math.max(current.followers, Number(st.followers) || 0),
+              ratingSum: Math.max(current.ratingSum, Number(st.ratingSum) || 0),
+              ratingCount: Math.max(current.ratingCount, Number(st.ratingCount) || 0),
+              commentCount: Math.max(current.commentCount, Number(st.commentCount) || 0),
+            };
+            cachedStoryStatsMap.set(sId, updated);
+            notifyStoryStatsSubscribers(sId, updated);
           }
         }
       },
@@ -1793,10 +1881,15 @@ export const subscribeToStoryStats = (
         .then((res) => (res && res.ok ? res.json() : null))
         .then((stats) => {
           if (stats) {
+            const current = cachedStoryStatsMap.get(storyId);
             notifyStoryStatsSubscribers(storyId, {
               ...stats,
-              views: Math.max(stats.views || 0, initialData.views),
-              likes: Math.max(stats.likes || 0, initialData.likes),
+              views: Math.max(Number(stats.views) || 0, initialData.views, current?.views || 0),
+              likes: Math.max(Number(stats.likes) || 0, initialData.likes, current?.likes || 0),
+              followers: Math.max(Number(stats.followers) || 0, current?.followers || 0),
+              ratingSum: Math.max(Number(stats.ratingSum) || 0, current?.ratingSum || 0),
+              ratingCount: Math.max(Number(stats.ratingCount) || 0, current?.ratingCount || 0),
+              commentCount: Math.max(Number(stats.commentCount) || 0, current?.commentCount || 0),
             });
           }
         })
@@ -2020,7 +2113,20 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ delta }),
-    }).catch(() => {});
+    })
+      .then((res) => (res && res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.stats) {
+          notifyStoryStatsSubscribers(storyId, {
+            ...currentStats,
+            ...data.stats,
+          });
+        }
+        if (data?.globalStats) {
+          notifyGlobalStatsSubscribers(data.globalStats);
+        }
+      })
+      .catch(() => {});
   }
 
   // 2. Firestore atomic merge increment directly into consolidated document
@@ -2030,6 +2136,13 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
       setDoc(
         globalDocRef,
         {
+          stories: {
+            [storyId]: {
+              storyId,
+              followers: increment(delta),
+              updatedAt: new Date().toISOString(),
+            },
+          },
           [`stories.${storyId}.followers`]: increment(delta),
           [`stories.${storyId}.storyId`]: storyId,
           [`stories.${storyId}.updatedAt`]: new Date().toISOString(),
@@ -2062,13 +2175,42 @@ export const toggleStoryFollow = async (storyId: string, isFollowing: boolean): 
  * Submit a real reader rating (1-5 stars) for a story.
  */
 export const submitStoryRating = async (storyId: string, stars: number): Promise<void> => {
+  // 0. Immediate optimistic update locally
+  const current = cachedStoryStatsMap.get(storyId) || {
+    views: 0,
+    likes: 0,
+    followers: 0,
+    ratingSum: 0,
+    ratingCount: 0,
+    commentCount: 0,
+  };
+  const updated = {
+    ...current,
+    ratingSum: (current.ratingSum || 0) + stars,
+    ratingCount: (current.ratingCount || 0) + 1,
+  };
+  notifyStoryStatsSubscribers(storyId, updated);
+
   // 1. Server Engine
   if (hasBackendServer()) {
     safeApiFetch(`/api/stories/${encodeURIComponent(storyId)}/rate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stars }),
-    }).catch(() => {});
+    })
+      .then((res) => (res && res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.stats) {
+          notifyStoryStatsSubscribers(storyId, {
+            ...current,
+            ...data.stats,
+          });
+        }
+        if (data?.globalStats) {
+          notifyGlobalStatsSubscribers(data.globalStats);
+        }
+      })
+      .catch(() => {});
   }
 
   // 2. Firestore atomic merge increment directly into consolidated document
@@ -2078,6 +2220,14 @@ export const submitStoryRating = async (storyId: string, stars: number): Promise
       setDoc(
         globalDocRef,
         {
+          stories: {
+            [storyId]: {
+              storyId,
+              ratingSum: increment(stars),
+              ratingCount: increment(1),
+              updatedAt: new Date().toISOString(),
+            },
+          },
           [`stories.${storyId}.ratingSum`]: increment(stars),
           [`stories.${storyId}.ratingCount`]: increment(1),
           [`stories.${storyId}.storyId`]: storyId,

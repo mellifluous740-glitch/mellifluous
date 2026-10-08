@@ -680,8 +680,10 @@ app.post('/api/stories/:id/rate', (req: Request, res: Response) => {
     const { id } = req.params;
     const { stars } = req.body;
     const stats = submitStoryRating(id, Number(stars) || 5);
+    const globalStats = getGlobalStats(getLiveActiveReadersCount());
     broadcastEvent('story_stats_updated', { storyId: id, stats });
-    res.json({ success: true, stats });
+    broadcastEvent('stats_updated', globalStats);
+    res.json({ success: true, stats, globalStats });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to rate story' });
   }

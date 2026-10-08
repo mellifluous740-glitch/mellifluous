@@ -950,10 +950,13 @@ const loadStats = () => {
           const sLikes = storiesMap[s.id]?.likes !== undefined ? storiesMap[s.id].likes : (s.likes || 0);
           return acc + (Number(sLikes) || 0);
         }, 0);
+        const aggregateStoryFollowers: number = Object.values(storiesMap as Record<string, any>).reduce((acc: number, s: any): number => {
+          return acc + (Number(s?.followers) || 0);
+        }, 0);
         cachedStats = {
           global: {
             totalVisits: Math.max(1, Number(globalData.totalVisits) || Number(loaded.totalVisits) || 1),
-            totalFollowers: Math.max(0, Number(globalData.totalFollowers) || Number(loaded.totalFollowers) || 0),
+            totalFollowers: Math.max(aggregateStoryFollowers, Number((globalData as any)?.totalFollowers) || Number((loaded as any)?.totalFollowers) || 0),
             totalLikes: Math.max(Number(globalData.totalLikes) || 0, aggregateStoryLikes),
           },
           stories: storiesMap,
@@ -996,9 +999,15 @@ export const getGlobalStats = (liveActiveCount?: number) => {
   const effectiveTotalLikes = Math.max(cachedStats.global.totalLikes || 0, aggregateStoryLikes);
   cachedStats.global.totalLikes = effectiveTotalLikes;
 
+  const aggregateStoryFollowers = Object.values(cachedStats.stories).reduce((acc: number, s: any) => {
+    return acc + (Number(s?.followers) || 0);
+  }, 0);
+  const effectiveTotalFollowers = Math.max(cachedStats.global.totalFollowers || 0, aggregateStoryFollowers);
+  cachedStats.global.totalFollowers = effectiveTotalFollowers;
+
   return {
     totalVisits: Math.max(1, cachedStats.global.totalVisits || 1),
-    totalFollowers: Math.max(0, cachedStats.global.totalFollowers || 0),
+    totalFollowers: effectiveTotalFollowers,
     totalLikes: effectiveTotalLikes,
     totalComments: cachedComments.length,
     activeReaders: typeof liveActiveCount === 'number' ? Math.max(1, liveActiveCount) : 1,
@@ -1094,7 +1103,10 @@ export const toggleStoryFollow = (storyId: string, delta: number) => {
     cachedStats.stories[storyId] = { views: 0, likes: 0, followers: 0, ratingSum: 0, ratingCount: 0 };
   }
   cachedStats.stories[storyId].followers = Math.max(0, (cachedStats.stories[storyId].followers || 0) + delta);
-  cachedStats.global.totalFollowers = Math.max(0, (cachedStats.global.totalFollowers || 0) + delta);
+  const aggregateStoryFollowers = Object.values(cachedStats.stories).reduce((sum: number, s: any) => {
+    return sum + (Number(s?.followers) || 0);
+  }, 0);
+  cachedStats.global.totalFollowers = Math.max(aggregateStoryFollowers, (cachedStats.global.totalFollowers || 0) + delta);
   persistStatsSafe();
   return getStoryStats(storyId);
 };

@@ -159,6 +159,7 @@ export const StoryModal: React.FC<StoryModalProps> = ({
   const handleToggleFollow = () => {
     const nextState = !isFollowed;
     setIsFollowed(nextState);
+    setLiveFollowers((prev) => Math.max(0, prev + (nextState ? 1 : -1)));
     try {
       if (nextState) localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
       else localStorage.removeItem(`mel_followed_story_${story.id}`);

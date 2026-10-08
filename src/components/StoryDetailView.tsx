@@ -72,7 +72,13 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [ratingSum, setRatingSum] = useState<number>(0);
   const [ratingCount, setRatingCount] = useState<number>(0);
-  const [userRating, setUserRating] = useState<number>(0);
+  const [userRating, setUserRating] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem(`mel_rated_story_${story.id}`)) || 0;
+    } catch {
+      return 0;
+    }
+  });
   const [hoverRating, setHoverRating] = useState<number>(0);
 
   const [isLiked, setIsLiked] = useState<boolean>(() => {
@@ -215,6 +221,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
   const handleToggleFollow = () => {
     const nextState = !isFollowed;
     setIsFollowed(nextState);
+    setFollowersCount((prev) => Math.max(0, prev + (nextState ? 1 : -1)));
     try {
       if (nextState) localStorage.setItem(`mel_followed_story_${story.id}`, 'true');
       else localStorage.removeItem(`mel_followed_story_${story.id}`);
@@ -223,7 +230,17 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
   };
 
   const handleRating = (stars: number) => {
+    const prevRating = userRating;
     setUserRating(stars);
+    try {
+      localStorage.setItem(`mel_rated_story_${story.id}`, String(stars));
+    } catch {}
+    if (!prevRating) {
+      setRatingCount((c) => c + 1);
+      setRatingSum((s) => s + stars);
+    } else {
+      setRatingSum((s) => s - prevRating + stars);
+    }
     submitStoryRating(story.id, stars);
   };
 

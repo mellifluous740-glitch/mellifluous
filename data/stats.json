@@ -10,11 +10,11 @@
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
-      "views": 32,
-      "likes": 4,
-      "followers": 0,
-      "ratingSum": 0,
-      "ratingCount": 0,
+      "views": 42,
+      "likes": 5,
+      "followers": 5,
+      "ratingSum": 5,
+      "ratingCount": 1,
       "commentCount": 0
     },
     "nang-luc-cua-man-em": {
@@ -50,7 +50,7 @@
       "commentCount": 0
     },
     "khac-ten-anh-len-bia-mo-cua-em": {
-      "views": 11,
+      "views": 10,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -58,9 +58,9 @@
       "commentCount": 0
     },
     "huong-dan-lang-phi-tinh-yeu": {
-      "views": 13,
+      "views": 15,
       "likes": 4,
-      "followers": 0,
+      "followers": 2,
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
@@ -73,6 +73,5 @@
       "ratingCount": 0,
       "commentCount": 0
     }
-  },
-  "updatedAt": "2026-10-08T10:27:36.910Z"
+  }
 }

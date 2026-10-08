@@ -748,7 +748,7 @@ export async function backupInteractiveDataToGithub(customData?: {
   }
 
   try {
-    const { getAllStoredComments, getStoredReaderLetters, getGlobalStats, getStoredAllStoryStats } = await import('./realtimeService');
+    const { getAllStoredComments, getStoredReaderLetters, getGlobalStats, getStoredAllStoryStats, extractStoryStatsFromCloudDoc } = await import('./realtimeService');
     const comments = customData?.comments || getAllStoredComments();
     const letters = customData?.letters || getStoredReaderLetters();
     const stats = customData?.stats || getGlobalStats();
@@ -787,27 +787,25 @@ export async function backupInteractiveDataToGithub(customData?: {
 
     // 3. Commit stats.json (consolidated master stats)
     const storiesStats = typeof (stats as any).stories === 'object' ? (stats as any).stories : getStoredAllStoryStats();
+    const mergedStories: Record<string, any> = { ...(storiesStats || {}) };
+    const cloudStories = cloudStats ? extractStoryStatsFromCloudDoc(cloudStats) : {};
+    for (const [sId, st] of Object.entries(cloudStories)) {
+      const localS = mergedStories[sId] || {};
+      mergedStories[sId] = {
+        views: Math.max(Number(localS.views) || 0, Number(st.views) || 0),
+        likes: Math.max(Number(localS.likes) || 0, Number(st.likes) || 0),
+        followers: Math.max(Number(localS.followers) || 0, Number(st.followers) || 0),
+        ratingSum: Math.max(Number(localS.ratingSum) || 0, Number(st.ratingSum) || 0),
+        ratingCount: Math.max(Number(localS.ratingCount) || 0, Number(st.ratingCount) || 0),
+        commentCount: Math.max(Number(localS.commentCount) || 0, Number(st.commentCount) || 0),
+      };
+    }
+
+    const storyFollowersSum = Object.values(mergedStories).reduce((acc: number, s: any) => acc + (Number(s?.followers) || 0), 0);
     const mergedVisits = Math.max(1, stats.totalVisits || 1, Number(cloudStats?.totalVisits) || 0);
-    const mergedFollowers = Math.max(0, stats.totalFollowers || 0, Number(cloudStats?.totalFollowers) || 0);
+    const mergedFollowers = Math.max(0, stats.totalFollowers || 0, Number(cloudStats?.totalFollowers) || 0, storyFollowersSum);
     const mergedLikes = Math.max(0, stats.totalLikes || 0, Number(cloudStats?.totalLikes) || 0);
     const mergedComments = Math.max(comments.length, Number(cloudStats?.totalComments) || 0);
-
-    const mergedStories: Record<string, any> = { ...(storiesStats || {}) };
-    if (cloudStats?.stories && typeof cloudStats.stories === 'object') {
-      for (const [sId, st] of Object.entries(cloudStats.stories as Record<string, any>)) {
-        if (st && typeof st === 'object') {
-          const localS = mergedStories[sId] || {};
-          mergedStories[sId] = {
-            views: Math.max(Number(localS.views) || 0, Number(st.views) || 0),
-            likes: Math.max(Number(localS.likes) || 0, Number(st.likes) || 0),
-            followers: Math.max(Number(localS.followers) || 0, Number(st.followers) || 0),
-            ratingSum: Math.max(Number(localS.ratingSum) || 0, Number(st.ratingSum) || 0),
-            ratingCount: Math.max(Number(localS.ratingCount) || 0, Number(st.ratingCount) || 0),
-            commentCount: Math.max(Number(localS.commentCount) || 0, Number(st.commentCount) || 0),
-          };
-        }
-      }
-    }
 
     const fullStats = {
       totalVisits: mergedVisits,
