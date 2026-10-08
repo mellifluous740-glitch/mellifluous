@@ -1,11 +1,11 @@
 {
-  "totalVisits": 93,
-  "totalFollowers": 8,
+  "totalVisits": 95,
+  "totalFollowers": 9,
   "totalLikes": 9,
   "totalComments": 3,
   "global": {
-    "totalVisits": 93,
-    "totalFollowers": 8,
+    "totalVisits": 95,
+    "totalFollowers": 9,
     "totalLikes": 9
   },
   "stories": {
@@ -60,7 +60,7 @@
     "huong-dan-lang-phi-tinh-yeu": {
       "views": 16,
       "likes": 4,
-      "followers": 2,
+      "followers": 3,
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
@@ -74,5 +74,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-08T13:40:29.907Z"
+  "updatedAt": "2026-10-08T14:06:51.104Z"
 }
