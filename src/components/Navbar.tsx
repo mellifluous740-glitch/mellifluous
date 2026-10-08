@@ -223,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* =================================================================== */}
         <nav
           aria-label="Thanh điều hướng chính"
-          className="hidden lg:flex items-center justify-center gap-1 xl:gap-2 2xl:gap-2.5 flex-1 min-w-0 px-1 xl:px-2"
+          className="hidden lg:flex items-center justify-center gap-1 xl:gap-1.5 2xl:gap-2.5 flex-1 min-w-0 px-1 xl:px-2"
         >
           {desktopNavItems.map((item) => {
             const isActive = currentTab === item.id;
@@ -233,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id={`nav-link-${item.id}`}
                 type="button"
                 onClick={() => handleSelect(item.id)}
-                className={`group relative px-2.5 2xl:px-3.5 py-1.5 rounded-xl text-xs 2xl:text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`group relative px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-xl text-xs xl:text-xs 2xl:text-sm font-medium transition-all duration-200 flex items-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
                   isActive
                     ? 'bg-pink-100/90 text-pink-900 dark:bg-pink-950/80 dark:text-pink-200 font-semibold shadow-2xs border border-pink-200/80 dark:border-pink-800'
                     : 'text-stone-600 hover:text-pink-600 hover:bg-pink-50/70 dark:text-stone-300 dark:hover:text-pink-300 dark:hover:bg-stone-800/60'
@@ -276,7 +276,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               id="navbar-author-account-dropdown-btn"
               onClick={() => setIsAuthorMenuOpen(!isAuthorMenuOpen)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 ${
                 user
                   ? isAuthor
                     ? 'bg-rose-50/90 hover:bg-rose-100/90 dark:bg-pink-950/80 dark:hover:bg-pink-900/80 text-rose-800 dark:text-pink-300 border-rose-200 dark:border-pink-800'
@@ -327,11 +327,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Dropdown Menu Popover */}
+            {/* Dropdown Menu Popover - Generous width (w-72 sm:w-80) to prevent text clipping */}
             {isAuthorMenuOpen && (
               <div
                 id="author-account-dropdown-menu"
-                className="absolute right-0 mt-2 w-64 rounded-2xl bg-white/98 dark:bg-stone-900/98 backdrop-blur-md border border-pink-200/90 dark:border-stone-700 shadow-2xl z-50 p-2 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150"
+                className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-white/98 dark:bg-stone-900/98 backdrop-blur-md border border-pink-200/90 dark:border-stone-700 shadow-2xl z-50 p-2.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150"
               >
                 {/* User Info Header */}
                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-50/70 via-rose-50/50 to-amber-50/30 dark:from-stone-800 dark:to-stone-850 border border-pink-100 dark:border-stone-700/80">
@@ -365,7 +365,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
 
-                {/* Reading List Option in Dropdown - Prominently featured for all readers */}
+                {/* Reading List Option in Dropdown - Prominently featured for all readers with generous spacing */}
                 <button
                   type="button"
                   id="navbar-user-reading-list-item"
@@ -373,21 +373,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsAuthorMenuOpen(false);
                     if (onOpenReadingList) onOpenReadingList();
                   }}
-                  className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-2.5 transition-colors cursor-pointer group border border-pink-100 dark:border-pink-900/40 bg-pink-50/40 dark:bg-pink-950/20"
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-3 transition-colors cursor-pointer group border border-pink-200/90 dark:border-pink-900/50 bg-pink-50/50 dark:bg-pink-950/20 shadow-2xs"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Library className="w-3.5 h-3.5" />
+                  <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Library className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold flex items-center justify-between text-pink-850 dark:text-pink-200">
-                      <span>Danh sách đọc & Tiến trình</span>
-                      {readingListCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-pink-500 text-white font-mono text-[10px] font-bold">
-                          {readingListCount}
+                    <div className="text-xs font-bold flex items-center justify-between text-pink-900 dark:text-pink-200">
+                      <span>Danh sách đọc của tôi</span>
+                      {readingListCount > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white font-mono text-[10px] font-bold shadow-2xs">
+                          {readingListCount} truyện
                         </span>
+                      ) : (
+                        <span className="text-[10px] text-stone-400 font-normal">0 truyện</span>
                       )}
                     </div>
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                    <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
                       Các tác phẩm đã lưu & chương đang đọc dở
                     </div>
                   </div>
@@ -402,19 +404,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setIsAuthorMenuOpen(false);
                       onOpenAuthorModal();
                     }}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-2.5 transition-colors cursor-pointer group"
+                    className="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-950/60 text-stone-800 dark:text-stone-100 flex items-center gap-3 transition-colors cursor-pointer group"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <PenTool className="w-3.5 h-3.5" />
+                    <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-950 text-pink-600 dark:text-pink-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <PenTool className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-semibold flex items-center gap-1.5 text-pink-700 dark:text-pink-300">
-                        <span>Quản trị</span>
+                        <span>Studio Tác giả & Quản trị</span>
                         <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200 font-sans">
-                          Studio
+                          Trang riêng
                         </span>
                       </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                      <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
                         Đăng truyện, sửa chương, quản lý nhạc & thẻ
                       </div>
                     </div>
@@ -605,12 +607,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Mobile & Tablet Hamburger Menu Button (xl:hidden) */}
+          {/* Mobile & Tablet Hamburger Menu Button (lg:hidden) */}
           <button
             type="button"
             id="mobile-menu-toggle-btn"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="xl:hidden flex items-center justify-center h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 dark:bg-stone-800 dark:text-pink-400 dark:hover:bg-stone-700 border border-pink-200/80 dark:border-stone-700 cursor-pointer transition-colors shadow-2xs gap-1.5"
+            className="lg:hidden flex items-center justify-center h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 dark:bg-stone-800 dark:text-pink-400 dark:hover:bg-stone-700 border border-pink-200/80 dark:border-stone-700 cursor-pointer transition-colors shadow-2xs gap-1.5"
             aria-label="Mở menu chuyển hướng"
             aria-expanded={isMobileMenuOpen}
           >
@@ -636,7 +638,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
 
     {/* =================================================================== */}
-    {/* 4. RESPONSIVE MOBILE & TABLET DRAWER NAVIGATION (xl:hidden)         */}
+    {/* 4. RESPONSIVE MOBILE & TABLET DRAWER NAVIGATION (lg:hidden)         */}
     {/* Mounted directly to document.body via Portal to prevent CSS squish  */}
     {/* =================================================================== */}
     {isMobileMenuOpen &&
@@ -645,7 +647,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div
           id="mobile-drawer-portal"
           data-theme={isDarkMode ? 'dark' : 'light'}
-          className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 top-14 sm:top-16 z-[9999] xl:hidden flex flex-col`}
+          className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 top-14 sm:top-16 z-[9999] lg:hidden flex flex-col`}
         >
           {/* Backdrop overlay */}
           <div

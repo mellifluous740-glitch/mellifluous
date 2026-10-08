@@ -11,6 +11,7 @@ import {
   getStoredAnnouncements,
 } from './lib/realtimeService';
 import { AuthorPublishModal } from './components/AuthorPublishModal';
+import { AuthorStudioPage } from './components/AuthorStudioPage';
 import { initPeriodicBatchSync } from './lib/githubSyncService';
 import { Navbar } from './components/Navbar';
 import { HeroIntro } from './components/HeroIntro';
@@ -111,8 +112,10 @@ export default function App() {
   const handleOpenAuthorModal = (tab?: string) => {
     if (tab) {
       setAuthorModalInitialTab(tab);
+      navigate(`/quan-tri?tab=${tab}`);
+    } else {
+      navigate('/quan-tri');
     }
-    setIsAuthorModalOpen(true);
   };
 
   // Periodic automatic batch sync to GitHub (every 15-20 minutes, pushes comments, letters and stats in background)
@@ -392,6 +395,22 @@ export default function App() {
       {/* Main Content Area with top padding to clear fixed navbar */}
       <main className="flex-1 max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 pb-12 w-full pt-20 sm:pt-24">
         <Routes>
+          {/* DEDICATED INTEGRATED AUTHOR STUDIO & STORY MANAGEMENT PAGE */}
+          <Route
+            path="/quan-tri"
+            element={
+              <AuthorStudioPage
+                stories={stories}
+                announcements={announcements}
+                onStoriesUpdated={() => {
+                  setChaptersVersion((v) => v + 1);
+                }}
+              />
+            }
+          />
+          <Route path="/studio" element={<Navigate to="/quan-tri" replace />} />
+          <Route path="/tac-gia" element={<Navigate to="/quan-tri" replace />} />
+
           {/* DEDICATED STORY & CHAPTER ROUTES FOR DIRECT SHARING AND DEEP LINKING */}
           <Route path="/bai-viet/:id" element={<StoryDetailPage stories={stories} />} />
           <Route path="/bai-viet/:id/chuong/:chapterNumber" element={<StoryDetailPage stories={stories} />} />
