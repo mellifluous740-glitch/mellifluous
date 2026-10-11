@@ -34,8 +34,8 @@ export interface RichTextEditorProps {
   placeholder?: string;
   label?: string;
   required?: boolean;
-  minHeight?: number;
-  maxHeight?: number;
+  minHeight?: number | string;
+  maxHeight?: number | string;
   helperText?: string;
   fontFamily?: 'serif' | 'sans';
   id?: string;
@@ -43,6 +43,15 @@ export interface RichTextEditorProps {
   showWordCount?: boolean;
   isExpandable?: boolean;
 }
+
+const parseDimension = (val: number | string | undefined, defaultVal: number): number => {
+  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
+  if (typeof val === 'string') {
+    const parsed = parseInt(val, 10);
+    return isNaN(parsed) ? defaultVal : parsed;
+  }
+  return defaultVal;
+};
 
 const FONT_SIZE_OPTIONS = [
   { label: 'Cỡ chữ mặc định', value: 'default', sizeBadge: 'Mặc định', previewStyle: { fontSize: '14px' } },
@@ -99,7 +108,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   }, [isFontSizeOpen]);
 
-  const effectiveMaxHeight = Math.max(maxHeight, minHeight);
+  const effectiveMinHeight = parseDimension(minHeight, 220);
+  const effectiveMaxHeight = Math.max(parseDimension(maxHeight, 540), effectiveMinHeight);
 
   // Synchronize incoming value with visual editor
   useEffect(() => {
@@ -706,7 +716,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   fontFamily === 'serif' ? 'font-serif' : 'font-sans'
                 } text-stone-900 dark:text-stone-100 text-sm sm:text-base leading-relaxed custom-scrollbar`}
                 style={{
-                  minHeight: `${minHeight}px`,
+                  minHeight: `${effectiveMinHeight}px`,
                   maxHeight: isFullscreen ? '100%' : `${effectiveMaxHeight}px`,
                 }}
               >
@@ -726,7 +736,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 placeholder={placeholder}
                 className="w-full flex-1 p-4 bg-transparent outline-none resize-none font-mono text-xs sm:text-sm leading-relaxed text-stone-900 dark:text-stone-100 custom-scrollbar overflow-y-auto"
                 style={{
-                  minHeight: `${minHeight}px`,
+                  minHeight: `${effectiveMinHeight}px`,
                   maxHeight: isFullscreen ? '100%' : `${effectiveMaxHeight}px`,
                 }}
               />
@@ -747,7 +757,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   isFullscreen ? 'h-full' : ''
                 }`}
                 style={{
-                  minHeight: `${minHeight}px`,
+                  minHeight: `${effectiveMinHeight}px`,
                   maxHeight: isFullscreen ? '100%' : `${effectiveMaxHeight}px`,
                   // Ensure no default indentation
                   textIndent: '0',
