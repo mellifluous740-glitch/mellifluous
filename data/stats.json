@@ -1,10 +1,10 @@
 {
-  "totalVisits": 107,
+  "totalVisits": 108,
   "totalFollowers": 9,
   "totalLikes": 9,
   "totalComments": 3,
   "global": {
-    "totalVisits": 107,
+    "totalVisits": 108,
     "totalFollowers": 9,
     "totalLikes": 9
   },
@@ -63,7 +63,7 @@
       "followers": 3,
       "ratingSum": 0,
       "ratingCount": 0,
-      "commentCount": 0
+      "commentCount": 2
     },
     "chao-em-co-gai-yeu-mau-trang": {
       "views": 0,
@@ -74,7 +74,7 @@
       "commentCount": 0
     },
     "thang-tu-on-hoa": {
-      "views": 1,
+      "views": 2,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -82,5 +82,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-11T17:43:11.012Z"
+  "updatedAt": "2026-10-11T18:05:39.336Z"
 }
