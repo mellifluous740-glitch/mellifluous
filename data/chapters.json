@@ -2116,9 +2116,9 @@
       "id": "thang-tu-on-hoa-c1",
       "storyId": "thang-tu-on-hoa",
       "chapterNumber": 1,
-      "title": "Anh ấy đi tu nghiệp về rồi sao?",
+      "title": "Chương 1",
       "publishedAt": "2026-10-11T16:09:00.000Z",
-      "updatedAt": "2026-10-11T16:29:30.190Z",
+      "updatedAt": "2026-10-11T18:17:00.697Z",
       "isLocked": false,
       "passwordHint": "",
       "passwordKey": "",
@@ -2279,7 +2279,9 @@
       "wordCount": 4108,
       "isExtra": false,
       "extraNumber": 0,
-      "partType": "main"
+      "partType": "main",
+      "chapterId": "thang-tu-on-hoa-c9",
+      "deleted": false
     }
   ]
 }
