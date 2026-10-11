@@ -1,10 +1,10 @@
 {
-  "totalVisits": 106,
+  "totalVisits": 107,
   "totalFollowers": 9,
   "totalLikes": 9,
   "totalComments": 3,
   "global": {
-    "totalVisits": 106,
+    "totalVisits": 107,
     "totalFollowers": 9,
     "totalLikes": 9
   },
@@ -72,7 +72,15 @@
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
+    },
+    "thang-tu-on-hoa": {
+      "views": 1,
+      "likes": 0,
+      "followers": 0,
+      "ratingSum": 0,
+      "ratingCount": 0,
+      "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-11T16:43:13.118Z"
+  "updatedAt": "2026-10-11T17:13:10.053Z"
 }
