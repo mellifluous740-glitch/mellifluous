@@ -13,10 +13,14 @@ export interface RichTextRendererProps {
 export function stripRichText(text?: string | null): string {
   if (!text) return '';
   let s = text;
+  // First strip ruby annotation notes (<rt>...</rt>) so annotations don't pollute plain-text excerpts
+  s = s.replace(/<rt\b[^>]*>[\s\S]*?<\/rt>/gi, '');
+  s = s.replace(/\[ruby=[^\]]*\]([\s\S]*?)\[\/ruby\]/gi, '$1');
+  s = s.replace(/\[size=[^\]]*\]([\s\S]*?)\[\/size\]/gi, '$1');
   // Strip HTML tags
   s = s.replace(/<[^>]*>/g, ' ');
   // Strip BBCode tags
-  s = s.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark)[^\]]*\]/gi, ' ');
+  s = s.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark|ruby|rt|size|sup|sub)[^\]]*\]/gi, ' ');
   // Strip markdown markers
   s = s.replace(/\*\*\*([^*]+?)\*\*\*/g, '$1');
   s = s.replace(/\*\*([^*]+?)\*\*/g, '$1');
@@ -29,7 +33,8 @@ export function stripRichText(text?: string | null): string {
 
 /**
  * Sanitizes arbitrary HTML to prevent malicious XSS and cleans out
- * intrusive copied DevTools / browser inspector styles that break reader customization.
+ * intrusive copied DevTools / browser inspector styles that break reader customization,
+ * while safely preserving author-intended styles like font-size, text-align, and text-indent.
  */
 function sanitizeHtml(html: string): string {
   if (!html) return '';
@@ -51,10 +56,20 @@ function sanitizeHtml(html: string): string {
   s = s.replace(/\s*id="model-response-[^"]*"/g, '');
   s = s.replace(/\s*class="[^"]*markdown-main-panel[^"]*"/g, '');
 
-  // Strip intrusive inline styles (e.g. line-height: 1.15, hardcoded color, font-family)
-  // so reader themes, font choices, and line-height toggles can work freely.
-  s = s.replace(/\s*style="[^"]*(?:animation|line-height|color:\s*rgb|font-family|fill:)[^"]*"/gi, '');
-  s = s.replace(/\s*style="background-color:\s*rgba\(0,\s*0,\s*0,\s*0\);?"/gi, '');
+  // Clean intrusive inline styles (e.g. animation, line-height, hardcoded color: rgb, font-family),
+  // but explicitly PRESERVE author font-size, text-align, and text-indent.
+  s = s.replace(/style="([^"]*)"/gi, (match, styleContent) => {
+    let cleaned = styleContent
+      .replace(/animation[^;]+;?/gi, '')
+      .replace(/font-family[^;]+;?/gi, '')
+      .replace(/line-height[^;]+;?/gi, '')
+      .replace(/color:\s*rgb\([^)]+\);?/gi, '')
+      .replace(/fill:[^;]+;?/gi, '')
+      .replace(/background-color:\s*rgba\(0,\s*0,\s*0,\s*0\);?/gi, '')
+      .trim();
+    if (!cleaned || cleaned === ';') return '';
+    return `style="${cleaned}"`;
+  });
   s = s.replace(/\s*style=""/gi, '');
 
   return s;
@@ -125,8 +140,31 @@ export function formatRichTextToHtml(raw?: string | null, indentParagraphs = fal
   text = text.replace(/==([^=]+?)==/g, '<mark class="bg-pink-100 dark:bg-pink-950/60 text-inherit px-1 rounded-sm">$1</mark>');
   text = text.replace(/\[mark\]([\s\S]+?)\[\/mark\]/gi, '<mark class="bg-pink-100 dark:bg-pink-950/60 text-inherit px-1 rounded-sm">$1</mark>');
 
+  // Font size: [size=18px]text[/size] or [size=18]text[/size] or [size=1.2em]text[/size]
+  text = text.replace(/\[size=([0-9]+(?:px|em|rem|%)?)\]([\s\S]+?)\[\/size\]/gi, (_, size, inner) => {
+    const finalSize = /^[0-9]+$/.test(size) ? `${size}px` : size;
+    return `<span style="font-size: ${finalSize};" class="custom-font-size">${inner}</span>`;
+  });
+
+  // Superscript: [sup]text[/sup] (Chữ nhỏ trên đầu: m², m³, x², chú thích số ¹)
+  text = text.replace(/\[sup\]([\s\S]+?)\[\/sup\]/gi, '<sup class="superscript-text">$1</sup>');
+  // Subscript: [sub]text[/sub] (Chữ nhỏ phía dưới: H₂O)
+  text = text.replace(/\[sub\]([\s\S]+?)\[\/sub\]/gi, '<sub class="subscript-text">$1</sub>');
+
+  // Translator Ruby / Furigana Annotation (nếu có):
+  // Format 1: BBCode [ruby=ghi chú trên đầu]từ gốc[/ruby]
+  text = text.replace(/\[ruby=([^\]]+)\]([\s\S]+?)\[\/ruby\]/gi, (_, note, word) => {
+    const cleanNote = note.trim();
+    const cleanWord = word.trim();
+    return `<ruby class="translator-ruby font-inherit" title="Giải nghĩa: ${cleanNote}">${cleanWord}<rt class="ruby-text">${cleanNote}</rt></ruby>`;
+  });
+
+  // Format 2: Native HTML <ruby> tags, ensure styling & tooltip accessibility
+  text = text.replace(/<ruby(?![^>]*class=)([^>]*)>([\s\S]*?)<\/ruby>/gi, '<ruby class="translator-ruby font-inherit"$1>$2</ruby>');
+  text = text.replace(/<rt(?![^>]*class=)([^>]*)>([\s\S]*?)<\/rt>/gi, '<rt class="ruby-text"$1>$2</rt>');
+
   // 4. Clean up any remaining/unclosed stray BBCode tags so they NEVER leak as raw text!
-  text = text.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark)\]/gi, '');
+  text = text.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark|ruby|rt|size|sup|sub)\]/gi, '');
 
   // 5. Structure paragraphs and line breaks:
   // If the content is already fully wrapped in HTML blocks (<p>, <div, <blockquote, <h[1-6]), preserve it and inject invisible watermarks.

@@ -19,6 +19,12 @@ import {
   Code,
   FileText,
   RotateCcw,
+  Type,
+  ChevronDown,
+  Superscript,
+  Subscript,
+  Check,
+  X,
 } from 'lucide-react';
 import { RichTextRenderer, formatRichTextToHtml, stripRichText } from './RichTextRenderer';
 
@@ -37,6 +43,16 @@ export interface RichTextEditorProps {
   showWordCount?: boolean;
   isExpandable?: boolean;
 }
+
+const FONT_SIZE_OPTIONS = [
+  { label: 'Cỡ chữ mặc định', value: 'default', sizeBadge: 'Mặc định', previewStyle: { fontSize: '14px' } },
+  { label: 'Chữ nhỏ (Chú thích)', value: '13px', sizeBadge: '13px', previewStyle: { fontSize: '13px' } },
+  { label: 'Chữ vừa (Tiêu chuẩn)', value: '15px', sizeBadge: '15px', previewStyle: { fontSize: '15px' } },
+  { label: 'Chữ vừa lớn (Nhấn mạnh)', value: '18px', sizeBadge: '18px', previewStyle: { fontSize: '17px' } },
+  { label: 'Chữ lớn (Mở đầu)', value: '20px', sizeBadge: '20px', previewStyle: { fontSize: '19px' } },
+  { label: 'Chữ rất lớn (Đề mục)', value: '24px', sizeBadge: '24px', previewStyle: { fontSize: '22px' } },
+  { label: 'Chữ tiêu đề (Lớn nhất)', value: '28px', sizeBadge: '28px', previewStyle: { fontSize: '24px' } },
+];
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
@@ -62,6 +78,26 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [editorMode, setEditorMode] = useState<'visual' | 'source' | 'preview'>('visual');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Font size menu state
+  const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
+  const [currentFontSizeLabel, setCurrentFontSizeLabel] = useState('Cỡ chữ');
+  const fontSizeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close font size dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fontSizeMenuRef.current && !fontSizeMenuRef.current.contains(e.target as Node)) {
+        setIsFontSizeOpen(false);
+      }
+    };
+    if (isFontSizeOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFontSizeOpen]);
 
   const effectiveMaxHeight = Math.max(maxHeight, minHeight);
 
@@ -90,6 +126,30 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Execute rich formatting commands
   const executeCommand = (command: string, valueArgument?: string) => {
     if (editorMode !== 'visual') {
+      if (textareaRef.current) {
+        const ta = textareaRef.current;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const val = ta.value;
+        const selText = val.substring(start, end);
+        if (command === 'superscript') {
+          const replacement = `<sup>${selText || '2'}</sup>`;
+          onChange(val.substring(0, start) + replacement + val.substring(end));
+          return;
+        } else if (command === 'subscript') {
+          const replacement = `<sub>${selText || '2'}</sub>`;
+          onChange(val.substring(0, start) + replacement + val.substring(end));
+          return;
+        } else if (command === 'bold') {
+          const replacement = `**${selText || ''}**`;
+          onChange(val.substring(0, start) + replacement + val.substring(end));
+          return;
+        } else if (command === 'italic') {
+          const replacement = `*${selText || ''}*`;
+          onChange(val.substring(0, start) + replacement + val.substring(end));
+          return;
+        }
+      }
       setEditorMode('visual');
     }
 
@@ -134,6 +194,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       } else if (command === 'highlight') {
         // Toggle pink highlight
         document.execCommand('hiliteColor', false, '#fce7f3');
+      } else if (command === 'superscript') {
+        // Định dạng chữ nhỏ trên đầu (Superscript - ví dụ: m², x³, dấu bình phương, số chú thích)
+        document.execCommand('superscript', false);
+      } else if (command === 'subscript') {
+        // Định dạng chữ nhỏ phía dưới (Subscript - ví dụ: H₂O)
+        document.execCommand('subscript', false);
       } else {
         document.execCommand(command, false, valueArgument);
       }
@@ -142,6 +208,70 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     } catch (err) {
       console.warn('execCommand failed:', err);
     }
+  };
+
+  // Apply custom font size to selection
+  const handleApplyFontSize = (sizeVal: string) => {
+    const selectedOption = FONT_SIZE_OPTIONS.find((o) => o.value === sizeVal);
+    setCurrentFontSizeLabel(selectedOption ? selectedOption.sizeBadge : 'Cỡ chữ');
+
+    if (editorMode !== 'visual') {
+      if (textareaRef.current) {
+        const ta = textareaRef.current;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const val = ta.value;
+        const selText = val.substring(start, end) || 'văn bản';
+        const tag = sizeVal === 'default' ? selText : `[size=${sizeVal}]${selText}[/size]`;
+        const next = val.substring(0, start) + tag + val.substring(end);
+        onChange(next);
+      }
+      return;
+    }
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) {
+      if (editorRef.current) editorRef.current.focus();
+      return;
+    }
+    const range = sel.getRangeAt(0);
+
+    if (sizeVal === 'default') {
+      // Revert to default font size: remove font-size inline styles
+      let node: Node | null = range.startContainer;
+      while (node && node !== editorRef.current) {
+        if (node instanceof HTMLElement && (node.style.fontSize || node.classList.contains('custom-font-size'))) {
+          node.style.fontSize = '';
+          node.classList.remove('custom-font-size');
+          break;
+        }
+        node = node.parentNode;
+      }
+      document.execCommand('fontSize', false, '3');
+      editorRef.current.querySelectorAll('font[size]').forEach((f) => {
+        const span = document.createElement('span');
+        span.innerHTML = f.innerHTML;
+        f.parentNode?.replaceChild(span, f);
+      });
+      handleVisualInput();
+      return;
+    }
+
+    if (range.collapsed) {
+      return;
+    }
+
+    // Standard cross-browser font-size application
+    document.execCommand('fontSize', false, '7');
+    const fontTags = editorRef.current.querySelectorAll('font[size="7"]');
+    fontTags.forEach((f) => {
+      const span = document.createElement('span');
+      span.style.fontSize = sizeVal;
+      span.className = 'custom-font-size';
+      span.innerHTML = f.innerHTML;
+      f.parentNode?.replaceChild(span, f);
+    });
+    handleVisualInput();
   };
 
   // Switch between Visual, Source, and Preview modes
@@ -294,9 +424,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
         {/* Quick Help Box */}
         {showHelp && (
-          <div className="p-3 rounded-xl bg-pink-50/70 dark:bg-stone-800/70 border border-pink-200 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300 space-y-1.5">
+          <div className="p-3.5 rounded-2xl bg-pink-50/80 dark:bg-stone-800/80 border border-pink-200 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300 space-y-2">
             <div className="flex items-center justify-between font-semibold text-pink-700 dark:text-pink-300">
-              <span>🌸 Hướng dẫn bộ soạn thảo định dạng trực quan:</span>
+              <span>🌸 Hướng dẫn bộ soạn thảo định dạng & dịch truyện:</span>
               <button
                 type="button"
                 onClick={() => setShowHelp(false)}
@@ -305,6 +435,15 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 ✕ Đóng
               </button>
             </div>
+            <p className="leading-relaxed">
+              • <strong>Chỉnh sửa cỡ chữ:</strong> Bôi đen đoạn văn bản và chọn cỡ chữ trong menu (13px, 15px, 18px, 20px, 24px, 28px hoặc Mặc định) để tăng giảm kích thước đoạn văn hay tiêu đề linh hoạt.
+            </p>
+            <p className="leading-relaxed">
+              • <strong>Chữ nhỏ trên đầu (Chỉ số trên):</strong> Bôi đen số hoặc chữ cần làm nhỏ trên đầu (như số 2 trong mét vuông m², mét khối m³, dấu bình phương x², hoặc số chú thích nhỏ ¹ ²) và bấm nút <Superscript className="w-3 h-3 inline mx-0.5 text-pink-600" /> <strong>X²</strong>.
+            </p>
+            <p className="leading-relaxed">
+              • <strong>Chữ nhỏ phía dưới (Chỉ số dưới):</strong> Bôi đen số hoặc chữ cần làm nhỏ bên dưới (như số 2 trong công thức H₂O) và bấm nút <Subscript className="w-3 h-3 inline mx-0.5 text-pink-600" /> <strong>X₂</strong>.
+            </p>
             <p className="leading-relaxed">
               • <strong>Soạn thảo trực quan (WYSIWYG):</strong> Bôi đen văn bản rồi bấm nút tương ứng trên thanh công cụ. Chữ sẽ <strong>in đậm</strong>, <em>in nghiêng</em> hoặc được căn giữa ngay lập tức, không hiển thị mã ký hiệu như <code>**</code> hay <code>[center]</code>.
             </p>
@@ -327,6 +466,50 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <div className="sticky top-0 z-20 shrink-0 bg-stone-100/98 dark:bg-stone-800/98 backdrop-blur-sm border-b border-stone-200 dark:border-stone-700 px-2 sm:px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1 text-xs select-none rounded-t-2xl shadow-xs">
             {/* Main Formatting Action Buttons */}
             <div className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+              {/* Cỡ chữ văn bản (Font Size Selector) */}
+              <div className="relative flex items-center pr-1 border-r border-stone-200 dark:border-stone-700" ref={fontSizeMenuRef}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setIsFontSizeOpen(!isFontSizeOpen)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 border ${
+                    isFontSizeOpen
+                      ? 'bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-950 dark:text-pink-300 dark:border-pink-800'
+                      : 'hover:bg-white dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border-transparent'
+                  }`}
+                  title="Chỉnh sửa cỡ chữ cho đoạn văn hoặc phần bôi đen"
+                >
+                  <Type className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />
+                  <span className="font-sans leading-none">{currentFontSizeLabel}</span>
+                  <ChevronDown className="w-3 h-3 text-stone-400" />
+                </button>
+
+                {isFontSizeOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-44 rounded-2xl bg-white/98 dark:bg-stone-900/98 backdrop-blur-md border border-pink-200 dark:border-stone-700 shadow-2xl z-50 p-1.5 space-y-0.5 animate-in fade-in zoom-in-95">
+                    <div className="px-2 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                      Cỡ chữ văn bản
+                    </div>
+                    {FONT_SIZE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          handleApplyFontSize(opt.value);
+                          setIsFontSizeOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs hover:bg-pink-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 flex items-center justify-between cursor-pointer transition-colors"
+                      >
+                        <span style={opt.previewStyle} className="font-serif">{opt.label}</span>
+                        <span className="text-[10px] text-stone-400 font-mono px-1 rounded bg-stone-100 dark:bg-stone-800">
+                          {opt.sizeBadge}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Inline Styles */}
               <div className="flex items-center gap-0.5 pr-1 border-r border-stone-200 dark:border-stone-700">
                 <button
@@ -374,6 +557,26 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 >
                   <span className="w-3.5 h-3.5 flex items-center justify-center font-bold text-[10px] bg-pink-200 dark:bg-pink-900/60 text-pink-700 dark:text-pink-300 rounded-sm">H</span>
                 </button>
+                {/* Chữ nhỏ trên đầu / Chỉ số trên: m², x³, số chú thích ¹ */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => executeCommand('superscript')}
+                  className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 hover:text-pink-600 dark:hover:text-pink-400 transition-colors cursor-pointer"
+                  title="Chữ nhỏ trên đầu / Chỉ số trên (ví dụ: m², x³, dấu bình phương, số chú thích ¹)"
+                >
+                  <Superscript className="w-3.5 h-3.5" />
+                </button>
+                {/* Chữ nhỏ bên dưới / Chỉ số dưới: H₂O */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => executeCommand('subscript')}
+                  className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 hover:text-pink-600 dark:hover:text-pink-400 transition-colors cursor-pointer"
+                  title="Chữ nhỏ bên dưới / Chỉ số dưới (ví dụ: H₂O)"
+                >
+                  <Subscript className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Alignments: Left, Center, Right, Justify */}
@@ -416,7 +619,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 </button>
               </div>
 
-              {/* Structure: Indent (Explicit), Heading, Quote, Divider */}
+              {/* Structure: Indent, Heading, Quote, Divider, Remove Format */}
               <div className="flex items-center gap-0.5 pr-1 border-r border-stone-200 dark:border-stone-700">
                 <button
                   type="button"

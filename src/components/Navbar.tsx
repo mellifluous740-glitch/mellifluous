@@ -208,10 +208,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Title & Subtitle block */}
             <div className="flex flex-col justify-center min-w-0">
-              <span className="font-serif text-sm sm:text-base lg:text-lg font-bold tracking-tight bg-gradient-to-r from-pink-600 via-rose-500 to-amber-600 dark:from-pink-400 dark:via-rose-300 dark:to-amber-300 bg-clip-text text-transparent whitespace-nowrap leading-tight group-hover:opacity-90">
+              <span className="font-serif text-sm sm:text-base xl:text-lg font-bold tracking-tight bg-gradient-to-r from-pink-600 via-rose-500 to-amber-600 dark:from-pink-400 dark:via-rose-300 dark:to-amber-300 bg-clip-text text-transparent whitespace-nowrap leading-tight group-hover:opacity-90">
                 better and better
               </span>
-              <span className="hidden xs:block text-[9px] sm:text-[10px] text-stone-500 dark:text-stone-400 font-sans tracking-tight whitespace-nowrap leading-tight">
+              <span className="hidden xs:block lg:hidden xl:block text-[9px] sm:text-[10px] text-stone-500 dark:text-stone-400 font-sans tracking-tight whitespace-nowrap leading-tight">
                 Mellifluous ━ Mùa hạ
               </span>
             </div>
@@ -223,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* =================================================================== */}
         <nav
           aria-label="Thanh điều hướng chính"
-          className="hidden lg:flex items-center justify-center gap-1 xl:gap-1.5 2xl:gap-2.5 flex-1 min-w-0 px-1 xl:px-2"
+          className="hidden lg:flex items-center justify-center gap-1 xl:gap-1.5 2xl:gap-2.5 flex-1 min-w-0 mx-2 xl:mx-3 overflow-hidden"
         >
           {desktopNavItems.map((item) => {
             const isActive = currentTab === item.id;
@@ -233,14 +233,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id={`nav-link-${item.id}`}
                 type="button"
                 onClick={() => handleSelect(item.id)}
-                className={`group relative px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-xl text-xs xl:text-xs 2xl:text-sm font-medium transition-all duration-200 flex items-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`group relative px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-xl text-xs 2xl:text-sm font-medium transition-all duration-200 flex items-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
                   isActive
                     ? 'bg-pink-100/90 text-pink-900 dark:bg-pink-950/80 dark:text-pink-200 font-semibold shadow-2xs border border-pink-200/80 dark:border-pink-800'
                     : 'text-stone-600 hover:text-pink-600 hover:bg-pink-50/70 dark:text-stone-300 dark:hover:text-pink-300 dark:hover:bg-stone-800/60'
                 }`}
+                title={item.label}
               >
                 <span
-                  className={`shrink-0 transition-colors ${
+                  className={`shrink-0 transition-colors hidden xl:inline-flex ${
                     isActive
                       ? 'text-pink-600 dark:text-pink-400'
                       : 'text-stone-400 dark:text-stone-500 group-hover:text-pink-600 dark:group-hover:text-pink-300'
@@ -248,7 +249,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   {item.icon}
                 </span>
-                <span className="whitespace-nowrap leading-none">{item.label}</span>
+                <span className="whitespace-nowrap leading-none">
+                  {/* Compact label on 1024-1279px, full label on 1280px+ */}
+                  <span className="xl:hidden">{item.shortLabel}</span>
+                  <span className="hidden xl:inline">{item.label}</span>
+                </span>
                 {isActive && (
                   <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-gradient-to-r from-pink-500 to-rose-400 rounded-full" />
                 )}
@@ -260,7 +265,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* =================================================================== */}
         {/* 3. ACTION CONTROLS (INTEGRATED AUTHOR & ACCOUNT MENU, UTILITIES)     */}
         {/* =================================================================== */}
-        <div id="navbar-action-controls" className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div id="navbar-action-controls" className="flex items-center gap-1 sm:gap-1.5 xl:gap-2 shrink-0">
           {/* Realtime Notification Bell - Strictly for Logged-In Users */}
           {user && (
             <NotificationBell
@@ -276,7 +281,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               id="navbar-author-account-dropdown-btn"
               onClick={() => setIsAuthorMenuOpen(!isAuthorMenuOpen)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-2 xl:px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 ${
                 user
                   ? isAuthor
                     ? 'bg-rose-50/90 hover:bg-rose-100/90 dark:bg-pink-950/80 dark:hover:bg-pink-900/80 text-rose-800 dark:text-pink-300 border-rose-200 dark:border-pink-800'
@@ -295,7 +300,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>{(user.displayName || user.email || 'M')[0].toUpperCase()}</span>
                     )}
                   </div>
-                  <span className="font-serif truncate max-w-[85px] leading-none">
+                  <span className="font-serif truncate max-w-[70px] xl:max-w-[85px] leading-none">
                     {isAuthor ? '🌸 Mel' : (user.displayName || 'Tài khoản')}
                   </span>
                   {readingListCount > 0 && (
