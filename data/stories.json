@@ -24,7 +24,7 @@
     "passwordHint": "",
     "passwordKey": "",
     "updatedAt": "2026-09-23T07:08:56.313Z",
-    "views": 10,
+    "views": 11,
     "likes": 0,
     "featured": true,
     "publishedAt": "2026-09-23T05:04:22.153Z"
@@ -55,7 +55,7 @@
     "passwordHint": "",
     "passwordKey": "",
     "updatedAt": "2026-09-23T07:08:56.314Z",
-    "views": 13,
+    "views": 19,
     "likes": 4,
     "featured": true,
     "publishedAt": "2026-09-23T05:04:22.151Z"
@@ -117,8 +117,8 @@
     "passwordHint": "",
     "passwordKey": "",
     "updatedAt": "2026-09-23T17:42:25.817Z",
-    "views": 32,
-    "likes": 4,
+    "views": 45,
+    "likes": 5,
     "featured": true
   },
   {
@@ -181,7 +181,7 @@
     "passwordHint": "",
     "passwordKey": "",
     "updatedAt": "2026-09-23T07:08:56.314Z",
-    "views": 0,
+    "views": 3,
     "likes": 0,
     "featured": true
   },
@@ -214,6 +214,37 @@
     "passwordHint": "",
     "passwordKey": "",
     "updatedAt": "2026-09-23T07:08:56.314Z",
+    "views": 0,
+    "likes": 0,
+    "featured": true
+  },
+  {
+    "id": "thang-tu-on-hoa",
+    "title": "Tháng tư ôn hòa",
+    "originalTitle": "",
+    "author": "Mộng Tiêu Nhị",
+    "translator": "Mellifluous",
+    "status": "completed",
+    "genre": [
+      "Ngôn tình",
+      "Hiện đại",
+      "Đô thị",
+      "Yêu thầm",
+      "Trưởng thành",
+      "Tinh anh trong ngành"
+    ],
+    "summary": "<!-- wp:paragraph -->\n<p>Hôm đó, Hứa Thanh Hòa bước ra khỏi phòng phẫu thuật thì trời đã muộn, không ngờ chủ nhiệm lại đứng đợi cô ngay bên ngoài.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Chủ nhiệm lên tiếng trước: “Bố cô cứ khăng khăng nói cô đơn thân đến giờ là do tôi bóc hốt hết thời gian, khiến cô không có rảnh mà yêu đương. Ngay tối nay tôi sẽ xếp cho cô một buổi xem mắt!”</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Hứa Thanh Hòa: “...”</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Trong lòng cô vốn đã có người mình thích, nên luôn lấy lý do công việc bận rộn để gạt phăng bố mẹ.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Còn chưa kịp tìm lý do từ chối, chủ nhiệm đã nói tiếp: “Người giới thiệu cho cô là Thời Ôn Lễ bên khoa Ngoại thần kinh.”</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Nghe thấy cái tên này, tim Hứa Thanh Hòa đột nhiên trật một nhịp.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Tiêu chuẩn của Thời Ôn Lễ xưa nay cực kỳ cao, ngay cả đối tượng xem mắt do viện trưởng giới thiệu anh cũng trực tiếp từ chối. Số người đuổi theo anh bị khéo léo từ chối lại càng vô số kể.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Những năm qua, để có thể đến gần anh hơn một chút, cô đã giấu kín mọi tâm tư của mình.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>“Chủ nhiệm, tôi với bác sĩ Thời ngày nào cũng ngẩng đầu không thấy cúi đầu thấy. Nếu bác sĩ gán ghép gượng ép mà anh ấy từ chối tôi, sau này gặp lại chẳng phải rất gượng gạo sao?”</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Chủ nhiệm: “Yên tâm, Thời Ôn Lễ đã đồng ý xem mắt với cô rồi.”</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>--</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Thời Ôn Lễ có nằm mơ cũng không ngờ, sẽ có một ngày mình đi xem mắt với chính đồng nghiệp của mình.</p>\n<!-- /wp:paragraph -->",
+    "totalChapters": 30,
+    "completedChapters": 0,
+    "mainChaptersCount": 30,
+    "extraChaptersCount": 0,
+    "coverImage": "https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=800&auto=format&fit=crop",
+    "colorTheme": "from-pink-100 to-rose-200 dark:from-pink-950/40 dark:to-rose-900/40",
+    "hasPassword": false,
+    "passwordHint": "",
+    "passwordKey": "",
+    "publishedAt": "2026-10-11T16:09:00.000Z",
+    "updatedAt": "2026-10-11T16:12:37.596Z",
     "views": 0,
     "likes": 0,
     "featured": true
