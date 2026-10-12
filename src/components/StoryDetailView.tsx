@@ -471,11 +471,7 @@ export const StoryDetailView: React.FC<StoryDetailViewProps> = ({
           <ArrowLeft className="w-4 h-4 text-pink-500" />
           <span>Quay lại danh sách truyện</span>
         </button>
-
-        <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          <span>Đồng bộ số liệu Firestore trực tiếp</span>
-        </div>
+        
       </div>
 
       {/* Main Story Hero Card */}
