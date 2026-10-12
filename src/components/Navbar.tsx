@@ -212,7 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 better and better
               </span>
               <span className="hidden xs:block lg:hidden xl:block text-[9px] sm:text-[10px] text-stone-500 dark:text-stone-400 font-sans tracking-tight whitespace-nowrap leading-tight">
-                Mellifluous ━ Mùa hạ
+                Mellifluous
               </span>
             </div>
           </button>
