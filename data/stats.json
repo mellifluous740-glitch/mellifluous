@@ -1,12 +1,12 @@
 {
-  "totalVisits": 109,
+  "totalVisits": 114,
   "totalFollowers": 9,
-  "totalLikes": 9,
+  "totalLikes": 10,
   "totalComments": 3,
   "global": {
-    "totalVisits": 109,
+    "totalVisits": 114,
     "totalFollowers": 9,
-    "totalLikes": 9
+    "totalLikes": 10
   },
   "stories": {
     "chanh-xanh-cuong-tuong": {
@@ -74,7 +74,7 @@
       "commentCount": 0
     },
     "thang-tu-on-hoa": {
-      "views": 2,
+      "views": 3,
       "likes": 0,
       "followers": 0,
       "ratingSum": 0,
@@ -82,5 +82,5 @@
       "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-11T18:29:05.864Z"
+  "updatedAt": "2026-10-12T16:12:04.196Z"
 }
