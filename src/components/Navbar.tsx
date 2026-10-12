@@ -395,7 +395,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       )}
                     </div>
                     <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
-                      Các tác phẩm đã lưu & chương đang đọc dở
+                      Danh sách đọc
                     </div>
                   </div>
                 </button>
@@ -416,10 +416,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-semibold flex items-center gap-1.5 text-pink-700 dark:text-pink-300">
-                        <span>Studio Tác giả & Quản trị</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200 font-sans">
-                          Trang riêng
-                        </span>
+                        <span>Quản trị</span>
                       </div>
                       <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
                         Đăng truyện, sửa chương, quản lý nhạc & thẻ
@@ -445,12 +442,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="min-w-0">
                       <div className="text-xs font-semibold flex items-center gap-1.5 text-stone-850 dark:text-stone-100">
                         <span>Bình luận độc giả</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200 font-sans">
-                          Mới
-                        </span>
                       </div>
                       <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                        Xem & phản hồi bạn đọc toàn trang
+                        Xem & phản hồi bạn đọc
                       </div>
                     </div>
                   </button>
