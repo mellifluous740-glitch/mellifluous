@@ -67,7 +67,6 @@ const DEFAULT_TRACKS: AudioTrack[] = [
 ];
 
 const DEFAULT_GENRES: string[] = [
-  'Tất cả các thể loại mùa hè',
   'Ngôn tình',
   'Thanh xuân',
   'Ngọt sủng',
@@ -486,6 +485,11 @@ export const initDataStore = () => {
       cachedGenres = JSON.parse(content);
       if (!Array.isArray(cachedGenres) || cachedGenres.length === 0) {
         cachedGenres = [...DEFAULT_GENRES];
+        writeJsonSafe(GENRES_FILE, cachedGenres);
+      } else {
+        cachedGenres = cachedGenres.filter(
+          (g) => typeof g === 'string' && g.toLowerCase() !== 'tất cả các thể loại mùa hè' && g.toLowerCase() !== 'tất cả thể loại mùa hè'
+        );
         writeJsonSafe(GENRES_FILE, cachedGenres);
       }
     } catch {

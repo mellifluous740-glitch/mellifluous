@@ -181,6 +181,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
   const [newStatus, setNewStatus] = useState<'completed' | 'ongoing'>('ongoing');
   const [newGenres, setNewGenres] = useState<string[]>(['Ngôn tình', 'Ngọt sủng']);
   const [newCustomGenreInput, setNewCustomGenreInput] = useState('');
+  const [newGenreSearch, setNewGenreSearch] = useState('');
   const [newSummary, setNewSummary] = useState('');
   const [newCover, setNewCover] = useState(PRESET_COVERS[0].url);
   const [newHasPassword, setNewHasPassword] = useState(false);
@@ -199,6 +200,8 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
   const [editTranslator, setEditTranslator] = useState('Mellifluous');
   const [editStatus, setEditStatus] = useState<'completed' | 'ongoing'>('ongoing');
   const [editGenres, setEditGenres] = useState<string[]>([]);
+  const [editCustomGenreInput, setEditCustomGenreInput] = useState('');
+  const [editGenreSearch, setEditGenreSearch] = useState('');
   const [editSummary, setEditSummary] = useState('');
   const [editCover, setEditCover] = useState('');
   const [editHasPassword, setEditHasPassword] = useState(false);
@@ -338,6 +341,49 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
       return unsub;
     }
   }, [activeMainTab, isAuthor]);
+
+  // Genre management handlers within Story Forms
+  const handleAddNewStoryGenre = async () => {
+    const trimmed = newCustomGenreInput.trim();
+    if (!trimmed) return;
+    const res = await addCustomGenre(trimmed);
+    if (res.success) {
+      showFeedback('success', res.message);
+      if (!newGenres.includes(trimmed)) {
+        setNewGenres((prev) => [...prev, trimmed]);
+      }
+      setNewCustomGenreInput('');
+    } else {
+      if (!newGenres.includes(trimmed)) {
+        setNewGenres((prev) => [...prev, trimmed]);
+        showFeedback('success', `Đã chọn thẻ "${trimmed}" cho tác phẩm!`);
+        setNewCustomGenreInput('');
+      } else {
+        showFeedback('error', res.message);
+      }
+    }
+  };
+
+  const handleAddEditStoryGenre = async () => {
+    const trimmed = editCustomGenreInput.trim();
+    if (!trimmed) return;
+    const res = await addCustomGenre(trimmed);
+    if (res.success) {
+      showFeedback('success', res.message);
+      if (!editGenres.includes(trimmed)) {
+        setEditGenres((prev) => [...prev, trimmed]);
+      }
+      setEditCustomGenreInput('');
+    } else {
+      if (!editGenres.includes(trimmed)) {
+        setEditGenres((prev) => [...prev, trimmed]);
+        showFeedback('success', `Đã chọn thẻ "${trimmed}" cho tác phẩm!`);
+        setEditCustomGenreInput('');
+      } else {
+        showFeedback('error', res.message);
+      }
+    }
+  };
 
   // =========================================================================
   // ACTIONS: 1. CREATE STORY
@@ -1098,36 +1144,103 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                     />
                   </div>
 
-                  {/* Genres Selection */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
-                      Thể loại & Gắn thẻ truyện
-                    </label>
-                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-850">
-                      {availableGenres.map((g) => {
-                        const isChecked = newGenres.includes(g);
-                        return (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => {
-                              if (isChecked) {
-                                setNewGenres(newGenres.filter((item) => item !== g));
-                              } else {
-                                setNewGenres([...newGenres, g]);
-                              }
-                            }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                              isChecked
-                                ? 'bg-pink-500 text-white shadow-2xs'
-                                : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300'
-                            }`}
-                          >
-                            {isChecked && '✓ '}
-                            {g}
-                          </button>
-                        );
-                      })}
+                  {/* Genres Selection & Tag Creation */}
+                  <div className="space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
+                          Thể loại & Gắn thẻ truyện <span className="text-rose-500">*</span>
+                        </label>
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                          Nhấp chọn các thẻ phù hợp hoặc tạo thêm thẻ mới tùy ý bên dưới
+                        </p>
+                      </div>
+
+                      {/* Search / Filter existing tags */}
+                      <div className="relative w-full sm:w-48">
+                        <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Tìm thẻ có sẵn..."
+                          value={newGenreSearch}
+                          onChange={(e) => setNewGenreSearch(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-hidden focus:ring-1 focus:ring-pink-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tag list pills */}
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-850 custom-scrollbar">
+                      {availableGenres
+                        .filter(
+                          (g) =>
+                            g &&
+                            g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                            (!newGenreSearch.trim() || g.toLowerCase().includes(newGenreSearch.toLowerCase().trim()))
+                        )
+                        .map((g) => {
+                          const isChecked = newGenres.includes(g);
+                          return (
+                            <button
+                              key={g}
+                              type="button"
+                              onClick={() => {
+                                if (isChecked) {
+                                  setNewGenres(newGenres.filter((item) => item !== g));
+                                } else {
+                                  setNewGenres([...newGenres, g]);
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                                isChecked
+                                  ? 'bg-pink-500 text-white shadow-xs font-semibold'
+                                  : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
+                              }`}
+                            >
+                              {isChecked ? <Check className="w-3 h-3 shrink-0" /> : <Tag className="w-2.5 h-2.5 text-stone-400 shrink-0" />}
+                              <span>{g}</span>
+                            </button>
+                          );
+                        })}
+                      {availableGenres.filter(
+                        (g) =>
+                          g &&
+                          g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                          (!newGenreSearch.trim() || g.toLowerCase().includes(newGenreSearch.toLowerCase().trim()))
+                      ).length === 0 && (
+                        <span className="text-xs text-stone-400 italic p-1">
+                          Không tìm thấy thẻ phù hợp. Bạn hãy nhập vào ô bên dưới để tạo mới!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Inline Add New Tag / Genre Input */}
+                    <div className="flex gap-2 pt-0.5">
+                      <div className="relative flex-1">
+                        <Tag className="w-3.5 h-3.5 text-pink-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Nhập tên thể loại / thẻ mới cần thêm (Ví dụ: Thanh xuân, Chữa lành, Showbiz...)..."
+                          value={newCustomGenreInput}
+                          onChange={(e) => setNewCustomGenreInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewStoryGenre();
+                            }
+                          }}
+                          className="w-full pl-9 pr-3.5 py-2 rounded-xl text-xs sm:text-sm bg-white dark:bg-stone-900 border border-pink-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-hidden focus:ring-2 focus:ring-pink-300"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddNewStoryGenre}
+                        disabled={!newCustomGenreInput.trim()}
+                        className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Thêm thẻ mới</span>
+                      </button>
                     </div>
                   </div>
 
@@ -2064,36 +2177,103 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                         />
                       </div>
 
-                      {/* Genres Selection */}
-                      <div className="space-y-2">
-                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
-                          Thể loại truyện
-                        </label>
-                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-850">
-                          {availableGenres.map((g) => {
-                            const isChecked = editGenres.includes(g);
-                            return (
-                              <button
-                                key={g}
-                                type="button"
-                                onClick={() => {
-                                  if (isChecked) {
-                                    setEditGenres(editGenres.filter((item) => item !== g));
-                                  } else {
-                                    setEditGenres([...editGenres, g]);
-                                  }
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                  isChecked
-                                    ? 'bg-pink-500 text-white shadow-2xs'
-                                    : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300'
-                                }`}
-                              >
-                                {isChecked && '✓ '}
-                                {g}
-                              </button>
-                            );
-                          })}
+                      {/* Genres Selection & Tag Creation */}
+                      <div className="space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
+                              Thể loại & Gắn thẻ truyện
+                            </label>
+                            <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                              Chọn hoặc gõ tên để thêm thẻ mới trực tiếp vào danh sách
+                            </p>
+                          </div>
+
+                          {/* Search / Filter existing tags */}
+                          <div className="relative w-full sm:w-48">
+                            <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Tìm thẻ có sẵn..."
+                              value={editGenreSearch}
+                              onChange={(e) => setEditGenreSearch(e.target.value)}
+                              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-hidden focus:ring-1 focus:ring-pink-400"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Tag list pills */}
+                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-855 custom-scrollbar">
+                          {availableGenres
+                            .filter(
+                              (g) =>
+                                g &&
+                                g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                                (!editGenreSearch.trim() || g.toLowerCase().includes(editGenreSearch.toLowerCase().trim()))
+                            )
+                            .map((g) => {
+                              const isChecked = editGenres.includes(g);
+                              return (
+                                <button
+                                  key={g}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isChecked) {
+                                      setEditGenres(editGenres.filter((item) => item !== g));
+                                    } else {
+                                      setEditGenres([...editGenres, g]);
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    isChecked
+                                      ? 'bg-pink-500 text-white shadow-xs font-semibold'
+                                      : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
+                                  }`}
+                                >
+                                  {isChecked ? <Check className="w-3 h-3 shrink-0" /> : <Tag className="w-2.5 h-2.5 text-stone-400 shrink-0" />}
+                                  <span>{g}</span>
+                                </button>
+                              );
+                            })}
+                          {availableGenres.filter(
+                            (g) =>
+                              g &&
+                              g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                              (!editGenreSearch.trim() || g.toLowerCase().includes(editGenreSearch.toLowerCase().trim()))
+                          ).length === 0 && (
+                            <span className="text-xs text-stone-400 italic p-1">
+                              Không tìm thấy thẻ phù hợp. Bạn hãy nhập vào ô bên dưới để tạo mới!
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Inline Add New Tag / Genre Input */}
+                        <div className="flex gap-2 pt-0.5">
+                          <div className="relative flex-1">
+                            <Tag className="w-3.5 h-3.5 text-pink-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Nhập tên thể loại / thẻ mới cần thêm (Ví dụ: Thanh xuân, Chữa lành, Showbiz...)..."
+                              value={editCustomGenreInput}
+                              onChange={(e) => setEditCustomGenreInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddEditStoryGenre();
+                                }
+                              }}
+                              className="w-full pl-9 pr-3.5 py-2 rounded-xl text-xs sm:text-sm bg-white dark:bg-stone-900 border border-pink-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-hidden focus:ring-2 focus:ring-pink-300"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddEditStoryGenre}
+                            disabled={!editCustomGenreInput.trim()}
+                            className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Thêm thẻ mới</span>
+                          </button>
                         </div>
                       </div>
 

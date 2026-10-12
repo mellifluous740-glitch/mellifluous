@@ -3,7 +3,6 @@ import { buildApiUrl, hasBackendServer } from '../lib/apiConfig';
 import { fetchRawGithubJson, getGithubConfig, commitGithubDataFile } from '../lib/githubSyncService';
 
 export const DEFAULT_GENRES: string[] = [
-  'Tất cả các thể loại mùa hè',
   'Ngôn tình',
   'Thanh xuân',
   'Ngọt sủng',
@@ -27,17 +26,20 @@ const STORAGE_KEY = 'mel_dynamic_genres_v3';
 type Listener = (genres: string[]) => void;
 const listeners = new Set<Listener>();
 
+const isUnwantedGenre = (g: unknown): boolean => {
+  if (typeof g !== 'string') return true;
+  const lower = g.trim().toLowerCase();
+  return lower === 'tất cả các thể loại mùa hè' || lower === 'tất cả thể loại mùa hè';
+};
+
 let cachedGenres: string[] = (() => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('mel_dynamic_genres_v2');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure "Tất cả các thể loại mùa hè" is present in genres
-        if (!parsed.some((g) => g.toLowerCase() === 'tất cả các thể loại mùa hè' || g.toLowerCase() === 'tất cả thể loại mùa hè')) {
-          parsed.unshift('Tất cả các thể loại mùa hè');
-        }
-        return parsed;
+        const filtered = parsed.filter((g) => !isUnwantedGenre(g));
+        return filtered.length > 0 ? filtered : [...DEFAULT_GENRES];
       }
     }
   } catch {}
@@ -50,7 +52,7 @@ function notify() {
 }
 
 function saveLocal(genres: string[]) {
-  cachedGenres = [...genres];
+  cachedGenres = genres.filter((g) => !isUnwantedGenre(g));
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedGenres));
     localStorage.setItem('mel_dynamic_genres_v2', JSON.stringify(cachedGenres));
@@ -60,7 +62,7 @@ function saveLocal(genres: string[]) {
 
 export const updateGenresFromRemote = (list: string[]) => {
   if (Array.isArray(list) && list.length > 0) {
-    const merged = Array.from(new Set([...cachedGenres, ...list]));
+    const merged = Array.from(new Set([...cachedGenres, ...list])).filter((g) => !isUnwantedGenre(g));
     saveLocal(merged);
   }
 };

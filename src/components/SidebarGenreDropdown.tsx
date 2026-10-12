@@ -19,7 +19,6 @@ interface SidebarGenreDropdownProps {
 
 // Map each genre to a fitting charming emoji
 const GENRE_EMOJIS: Record<string, string> = {
-  'Tất cả các thể loại mùa hè': '🌻',
   'Thanh xuân vườn trường': '🏫',
   'Ngọt sủng': '🍰',
   'Chữa lành': '☕',
@@ -63,11 +62,13 @@ export const SidebarGenreDropdown: React.FC<SidebarGenreDropdownProps> = ({
   // Combined genres: dynamic genres + any additional genres from stories
   const storyGenres = stories.flatMap((s) => s.genre);
   const allGenreSet = new Set<string>([...availableGenres, ...storyGenres]);
-  const allGenresList = Array.from(allGenreSet);
+  const allGenresList = Array.from(allGenreSet).filter(
+    (g) => g && g.trim().toLowerCase() !== 'tất cả các thể loại mùa hè' && g.trim().toLowerCase() !== 'tất cả thể loại mùa hè'
+  );
 
   // Count how many stories match each genre
   const getGenreCount = (genre: string) => {
-    if (genre === 'all' || genre === 'Tất cả các thể loại mùa hè') {
+    if (genre === 'all') {
       return stories.length;
     }
     return stories.filter((s) => s.genre.some((g) => g.toLowerCase() === genre.toLowerCase())).length;
@@ -129,10 +130,8 @@ export const SidebarGenreDropdown: React.FC<SidebarGenreDropdownProps> = ({
   };
 
   const handleToggleSelect = (genre: string) => {
-    // If clicking the currently selected genre, toggle it off to show all
-    if (selectedGenre === genre || (selectedGenre === 'all' && genre === 'Tất cả các thể loại mùa hè')) {
-      onFilterGenre('all');
-    } else if (genre === 'Tất cả các thể loại mùa hè') {
+    // If clicking the currently selected genre or 'all', toggle it off to show all
+    if (selectedGenre === genre || genre === 'all') {
       onFilterGenre('all');
     } else {
       onFilterGenre(genre);
