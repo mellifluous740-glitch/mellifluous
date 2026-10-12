@@ -1,11 +1,11 @@
 {
   "totalVisits": 114,
-  "totalFollowers": 9,
+  "totalFollowers": 10,
   "totalLikes": 10,
   "totalComments": 3,
   "global": {
     "totalVisits": 114,
-    "totalFollowers": 9,
+    "totalFollowers": 10,
     "totalLikes": 10
   },
   "stories": {
@@ -80,7 +80,15 @@
       "ratingSum": 0,
       "ratingCount": 0,
       "commentCount": 0
+    },
+    "ao-cua-cac-loai-chim-di-cu": {
+      "views": 4,
+      "likes": 0,
+      "followers": 1,
+      "ratingSum": 5,
+      "ratingCount": 1,
+      "commentCount": 0
     }
   },
-  "updatedAt": "2026-10-12T17:12:02.197Z"
+  "updatedAt": "2026-10-12T17:43:30.937Z"
 }
