@@ -26,7 +26,6 @@ const GENRE_EMOJIS: Record<string, string> = {
   'Học đường': '🎒',
   'Thầm yêu': '💌',
   'Song hướng': '💫',
-  'Mùa hè': '☀️',
   'Đô thị tình duyên': '🏙️',
   'Gương vỡ lại lành': '🪞',
   'Nhẹ nhàng': '🍃',
@@ -295,7 +294,7 @@ export const SidebarGenreDropdown: React.FC<SidebarGenreDropdownProps> = ({
               </div>
             </button>
 
-            {/* All Dynamic Genres (including 'Tất cả các thể loại mùa hè' and author-added tags) */}
+            {/* All Dynamic Genres & author-added tags */}
             {allGenresList.map((genre) => {
               const isSelected = selectedGenre === genre;
               const count = getGenreCount(genre);

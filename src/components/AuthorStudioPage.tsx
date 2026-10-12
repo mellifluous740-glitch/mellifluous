@@ -162,14 +162,24 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
     );
   }, [stories, storySearch]);
 
-  // Dynamic Genres
-  const [availableGenres, setAvailableGenres] = useState<string[]>(() => getCustomGenres());
+  // Dynamic Genres combined with any tags used in stories
+  const [availableGenres, setAvailableGenres] = useState<string[]>(() => {
+    const fromMgr = getCustomGenres();
+    const fromStories = stories.flatMap((s) => s.genre || []);
+    return Array.from(new Set([...fromMgr, ...fromStories])).filter(
+      (g) => g && g.trim().toLowerCase() !== 'tất cả các thể loại mùa hè' && g.trim().toLowerCase() !== 'mùa hè'
+    );
+  });
   useEffect(() => {
     const unsub = subscribeToCustomGenres((genres) => {
-      setAvailableGenres(genres);
+      const fromStories = stories.flatMap((s) => s.genre || []);
+      const merged = Array.from(new Set([...genres, ...fromStories])).filter(
+        (g) => g && g.trim().toLowerCase() !== 'tất cả các thể loại mùa hè' && g.trim().toLowerCase() !== 'mùa hè'
+      );
+      setAvailableGenres(merged);
     });
     return unsub;
-  }, []);
+  }, [stories]);
 
   // =========================================================================
   // 1. NEW STORY FORM STATE
@@ -344,45 +354,63 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
 
   // Genre management handlers within Story Forms
   const handleAddNewStoryGenre = async () => {
-    const trimmed = newCustomGenreInput.trim();
-    if (!trimmed) return;
-    const res = await addCustomGenre(trimmed);
-    if (res.success) {
-      showFeedback('success', res.message);
-      if (!newGenres.includes(trimmed)) {
-        setNewGenres((prev) => [...prev, trimmed]);
+    const rawInput = newCustomGenreInput.trim();
+    if (!rawInput) return;
+    const items = rawInput
+      .split(/[,;]+/)
+      .map((t) => t.trim())
+      .filter((t) => Boolean(t) && t.toLowerCase() !== 'tất cả các thể loại mùa hè' && t.toLowerCase() !== 'mùa hè');
+    if (items.length === 0) return;
+
+    let addedCount = 0;
+    const nextSelected = [...newGenres];
+    const nextAvailable = [...availableGenres];
+
+    for (const item of items) {
+      await addCustomGenre(item);
+      if (!nextAvailable.some((g) => g.toLowerCase() === item.toLowerCase())) {
+        nextAvailable.push(item);
       }
-      setNewCustomGenreInput('');
-    } else {
-      if (!newGenres.includes(trimmed)) {
-        setNewGenres((prev) => [...prev, trimmed]);
-        showFeedback('success', `Đã chọn thẻ "${trimmed}" cho tác phẩm!`);
-        setNewCustomGenreInput('');
-      } else {
-        showFeedback('error', res.message);
+      if (!nextSelected.some((g) => g.toLowerCase() === item.toLowerCase())) {
+        nextSelected.push(item);
+        addedCount++;
       }
     }
+
+    setAvailableGenres(nextAvailable);
+    setNewGenres(nextSelected);
+    setNewCustomGenreInput('');
+    showFeedback('success', `Đã thêm & chọn ${items.length} thẻ thể loại cho tác phẩm!`);
   };
 
   const handleAddEditStoryGenre = async () => {
-    const trimmed = editCustomGenreInput.trim();
-    if (!trimmed) return;
-    const res = await addCustomGenre(trimmed);
-    if (res.success) {
-      showFeedback('success', res.message);
-      if (!editGenres.includes(trimmed)) {
-        setEditGenres((prev) => [...prev, trimmed]);
+    const rawInput = editCustomGenreInput.trim();
+    if (!rawInput) return;
+    const items = rawInput
+      .split(/[,;]+/)
+      .map((t) => t.trim())
+      .filter((t) => Boolean(t) && t.toLowerCase() !== 'tất cả các thể loại mùa hè' && t.toLowerCase() !== 'mùa hè');
+    if (items.length === 0) return;
+
+    let addedCount = 0;
+    const nextSelected = [...editGenres];
+    const nextAvailable = [...availableGenres];
+
+    for (const item of items) {
+      await addCustomGenre(item);
+      if (!nextAvailable.some((g) => g.toLowerCase() === item.toLowerCase())) {
+        nextAvailable.push(item);
       }
-      setEditCustomGenreInput('');
-    } else {
-      if (!editGenres.includes(trimmed)) {
-        setEditGenres((prev) => [...prev, trimmed]);
-        showFeedback('success', `Đã chọn thẻ "${trimmed}" cho tác phẩm!`);
-        setEditCustomGenreInput('');
-      } else {
-        showFeedback('error', res.message);
+      if (!nextSelected.some((g) => g.toLowerCase() === item.toLowerCase())) {
+        nextSelected.push(item);
+        addedCount++;
       }
     }
+
+    setAvailableGenres(nextAvailable);
+    setEditGenres(nextSelected);
+    setEditCustomGenreInput('');
+    showFeedback('success', `Đã thêm & chọn ${items.length} thẻ thể loại cho tác phẩm!`);
   };
 
   // =========================================================================
@@ -1059,6 +1087,35 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                         placeholder="Ví dụ: Chanh Xanh Cuồng Tưởng"
                         className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-hidden focus:border-pink-400 text-stone-900 dark:text-stone-100"
                       />
+                      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                        <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium">Gợi ý chèn:</span>
+                        {[1, 2, 3].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => {
+                              const t = newTitle.trim();
+                              setNewTitle(t ? `${t} - Chương ${num}` : `Chương ${num}`);
+                            }}
+                            className="px-1.5 py-0.5 rounded-md text-[10px] bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                          >
+                            + Chương {num}
+                          </button>
+                        ))}
+                        {['Quyển 1', 'Phần 1', 'Ngoại truyện'].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              const t = newTitle.trim();
+                              setNewTitle(t ? `${t} (${tag})` : tag);
+                            }}
+                            className="px-1.5 py-0.5 rounded-md text-[10px] bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                          >
+                            + {tag}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold mb-1 text-stone-700 dark:text-stone-300">
@@ -1145,14 +1202,16 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                   </div>
 
                   {/* Genres Selection & Tag Creation */}
-                  <div className="space-y-2.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-pink-50/70 via-rose-50/40 to-pink-50/70 dark:from-stone-850 dark:to-stone-800 border border-pink-200 dark:border-stone-700 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-pink-100 dark:border-stone-700 pb-2.5">
                       <div>
-                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
-                          Thể loại & Gắn thẻ truyện <span className="text-rose-500">*</span>
+                        <label className="text-xs font-bold text-stone-800 dark:text-stone-100 uppercase tracking-wider flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-pink-500" />
+                          <span>Thể loại & Thẻ gắn tác phẩm</span>
+                          <span className="text-rose-500">*</span>
                         </label>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                          Nhấp chọn các thẻ phù hợp hoặc tạo thêm thẻ mới tùy ý bên dưới
+                          Chọn thẻ có sẵn hoặc gõ thêm thẻ mới tùy ý (ngăn cách bằng dấu phẩy)
                         </p>
                       </div>
 
@@ -1169,13 +1228,58 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                       </div>
                     </div>
 
+                    {/* ACTIVE SELECTED TAGS (Removable Chips) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                          Thẻ đang gán cho truyện ({newGenres.length}):
+                        </label>
+                        {newGenres.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setNewGenres([])}
+                            className="text-xs text-rose-500 hover:text-rose-700 font-medium cursor-pointer"
+                          >
+                            Xóa tất cả thẻ
+                          </button>
+                        )}
+                      </div>
+                      {newGenres.length === 0 ? (
+                        <div className="p-2.5 rounded-xl bg-white/70 dark:bg-stone-900/60 border border-dashed border-stone-300 dark:border-stone-700 text-center">
+                          <p className="text-xs text-stone-500 dark:text-stone-400">
+                            Chưa chọn thẻ nào. Vui lòng bấm chọn thẻ bên dưới hoặc nhập thẻ mới để thêm.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-pink-100 dark:border-stone-700/80">
+                          {newGenres.map((g) => (
+                            <span
+                              key={g}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-pink-500 text-white shadow-2xs group"
+                            >
+                              <span>{g}</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewGenres(newGenres.filter((item) => item !== g))}
+                                className="w-4 h-4 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center text-[10px] cursor-pointer"
+                                title={`Bỏ thẻ "${g}"`}
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Tag list pills */}
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-850 custom-scrollbar">
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-850 custom-scrollbar">
                       {availableGenres
                         .filter(
                           (g) =>
                             g &&
                             g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                            g.toLowerCase() !== 'mùa hè' &&
                             (!newGenreSearch.trim() || g.toLowerCase().includes(newGenreSearch.toLowerCase().trim()))
                         )
                         .map((g) => {
@@ -1194,7 +1298,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                               className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                                 isChecked
                                   ? 'bg-pink-500 text-white shadow-xs font-semibold'
-                                  : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
+                                  : 'bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
                               }`}
                             >
                               {isChecked ? <Check className="w-3 h-3 shrink-0" /> : <Tag className="w-2.5 h-2.5 text-stone-400 shrink-0" />}
@@ -1206,6 +1310,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                         (g) =>
                           g &&
                           g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                          g.toLowerCase() !== 'mùa hè' &&
                           (!newGenreSearch.trim() || g.toLowerCase().includes(newGenreSearch.toLowerCase().trim()))
                       ).length === 0 && (
                         <span className="text-xs text-stone-400 italic p-1">
@@ -1220,7 +1325,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                         <Tag className="w-3.5 h-3.5 text-pink-500 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
-                          placeholder="Nhập tên thể loại / thẻ mới cần thêm (Ví dụ: Thanh xuân, Chữa lành, Showbiz...)..."
+                          placeholder="Nhập thẻ mới (VD: Thanh xuân, Chữa lành, Showbiz; hỗ trợ nhiều thẻ cách nhau bằng dấu phẩy)..."
                           value={newCustomGenreInput}
                           onChange={(e) => setNewCustomGenreInput(e.target.value)}
                           onKeyDown={(e) => {
@@ -1545,9 +1650,9 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                             className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
                           />
                           {/* Quick chips for inserting chapter numbers */}
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                             <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium">Thêm nhanh:</span>
-                            {[1, 2, 3].map((num) => (
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                               <button
                                 key={num}
                                 type="button"
@@ -1557,21 +1662,27 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                                   setNewChapterNumber(num);
                                   setNewChapterPartType('main');
                                 }}
-                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 dark:hover:bg-pink-900/40 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                                  newChapterNumber === num && newChapterPartType === 'main'
+                                    ? 'bg-pink-500 text-white shadow-2xs'
+                                    : 'bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 dark:hover:bg-pink-900/40 text-stone-700 dark:text-stone-300 hover:text-pink-600'
+                                }`}
                               >
                                 + Chương {num}
                               </button>
                             ))}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const clean = newChapterTitle.replace(/^(Chương\s*\d+|Phiên ngoại\s*\d+|Ngoại truyện\s*\d+)[\s:]*/i, '').trim();
-                                setNewChapterTitle(`Chương ${newChapterNumber}: ${clean}`);
-                              }}
-                              className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-pink-50 dark:bg-pink-950/40 hover:bg-pink-100 text-pink-600 dark:text-pink-300 transition-colors cursor-pointer"
-                            >
-                              + Chương {newChapterNumber}
-                            </button>
+                            {newChapterNumber > 10 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const clean = newChapterTitle.replace(/^(Chương\s*\d+|Phiên ngoại\s*\d+|Ngoại truyện\s*\d+)[\s:]*/i, '').trim();
+                                  setNewChapterTitle(`Chương ${newChapterNumber}: ${clean}`);
+                                }}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300 cursor-pointer"
+                              >
+                                + Chương {newChapterNumber}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => {
@@ -1862,9 +1973,9 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                                 className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
                               />
                               {/* Quick chips for inserting chapter numbers */}
-                              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                                 <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium">Thêm nhanh:</span>
-                                {[1, 2, 3].map((num) => (
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                                   <button
                                     key={num}
                                     type="button"
@@ -1874,21 +1985,27 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                                       setEditChapNumber(num);
                                       setEditChapPartType('main');
                                     }}
-                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 dark:hover:bg-pink-900/40 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                                      editChapNumber === num && editChapPartType === 'main'
+                                        ? 'bg-pink-500 text-white shadow-2xs'
+                                        : 'bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 dark:hover:bg-pink-900/40 text-stone-700 dark:text-stone-300 hover:text-pink-600'
+                                    }`}
                                   >
                                     + Chương {num}
                                   </button>
                                 ))}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const clean = editChapTitle.replace(/^(Chương\s*\d+|Phiên ngoại\s*\d+|Ngoại truyện\s*\d+)[\s:]*/i, '').trim();
-                                    setEditChapTitle(`Chương ${editChapNumber}: ${clean}`);
-                                  }}
-                                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-pink-50 dark:bg-pink-950/40 hover:bg-pink-100 text-pink-600 dark:text-pink-300 transition-colors cursor-pointer"
-                                >
-                                  + Chương {editChapNumber}
-                                </button>
+                                {editChapNumber > 10 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const clean = editChapTitle.replace(/^(Chương\s*\d+|Phiên ngoại\s*\d+|Ngoại truyện\s*\d+)[\s:]*/i, '').trim();
+                                      setEditChapTitle(`Chương ${editChapNumber}: ${clean}`);
+                                    }}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300 cursor-pointer"
+                                  >
+                                    + Chương {editChapNumber}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2095,6 +2212,35 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                             onChange={(e) => setEditTitle(e.target.value)}
                             className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-hidden focus:border-pink-400"
                           />
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium">Gợi ý chèn:</span>
+                            {[1, 2, 3].map((num) => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => {
+                                  const t = editTitle.trim();
+                                  setEditTitle(t ? `${t} - Chương ${num}` : `Chương ${num}`);
+                                }}
+                                className="px-1.5 py-0.5 rounded-md text-[10px] bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                              >
+                                + Chương {num}
+                              </button>
+                            ))}
+                            {['Quyển 1', 'Phần 1', 'Ngoại truyện'].map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => {
+                                  const t = editTitle.trim();
+                                  setEditTitle(t ? `${t} (${tag})` : tag);
+                                }}
+                                className="px-1.5 py-0.5 rounded-md text-[10px] bg-stone-100 dark:bg-stone-800 hover:bg-pink-100 text-stone-700 dark:text-stone-300 hover:text-pink-600 transition-colors cursor-pointer"
+                              >
+                                + {tag}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold mb-1 text-stone-700 dark:text-stone-300">
@@ -2181,11 +2327,13 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                       <div className="space-y-2.5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div>
-                            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
-                              Thể loại & Gắn thẻ truyện
+                            <label className="text-xs font-bold text-stone-800 dark:text-stone-100 uppercase tracking-wider flex items-center gap-1.5">
+                              <Tag className="w-3.5 h-3.5 text-pink-500" />
+                              <span>Thể loại & Gắn thẻ truyện</span>
+                              <span className="text-rose-500">*</span>
                             </label>
                             <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                              Chọn hoặc gõ tên để thêm thẻ mới trực tiếp vào danh sách
+                              Chọn hoặc gõ tên để thêm thẻ mới trực tiếp vào danh sách (ngăn cách bằng dấu phẩy)
                             </p>
                           </div>
 
@@ -2202,13 +2350,58 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                           </div>
                         </div>
 
+                        {/* ACTIVE SELECTED TAGS (Removable Chips) */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                              Thẻ đang gán cho truyện ({editGenres.length}):
+                            </label>
+                            {editGenres.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setEditGenres([])}
+                                className="text-xs text-rose-500 hover:text-rose-700 font-medium cursor-pointer"
+                              >
+                                Xóa tất cả thẻ
+                              </button>
+                            )}
+                          </div>
+                          {editGenres.length === 0 ? (
+                            <div className="p-2.5 rounded-xl bg-white/70 dark:bg-stone-900/60 border border-dashed border-stone-300 dark:border-stone-700 text-center">
+                              <p className="text-xs text-stone-500 dark:text-stone-400">
+                                Chưa chọn thẻ nào. Vui lòng bấm chọn thẻ bên dưới hoặc nhập thẻ mới để thêm.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-pink-100 dark:border-stone-700/80">
+                              {editGenres.map((g) => (
+                                <span
+                                  key={g}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-pink-500 text-white shadow-2xs group"
+                                >
+                                  <span>{g}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditGenres(editGenres.filter((item) => item !== g))}
+                                    className="w-4 h-4 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center text-[10px] cursor-pointer"
+                                    title={`Bỏ thẻ "${g}"`}
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         {/* Tag list pills */}
-                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-855 custom-scrollbar">
+                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-855 custom-scrollbar">
                           {availableGenres
                             .filter(
                               (g) =>
                                 g &&
                                 g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                                g.toLowerCase() !== 'mùa hè' &&
                                 (!editGenreSearch.trim() || g.toLowerCase().includes(editGenreSearch.toLowerCase().trim()))
                             )
                             .map((g) => {
@@ -2227,7 +2420,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                                   className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                                     isChecked
                                       ? 'bg-pink-500 text-white shadow-xs font-semibold'
-                                      : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
+                                      : 'bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:border-pink-300 hover:bg-pink-50/50'
                                   }`}
                                 >
                                   {isChecked ? <Check className="w-3 h-3 shrink-0" /> : <Tag className="w-2.5 h-2.5 text-stone-400 shrink-0" />}
@@ -2239,6 +2432,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                             (g) =>
                               g &&
                               g.toLowerCase() !== 'tất cả các thể loại mùa hè' &&
+                              g.toLowerCase() !== 'mùa hè' &&
                               (!editGenreSearch.trim() || g.toLowerCase().includes(editGenreSearch.toLowerCase().trim()))
                           ).length === 0 && (
                             <span className="text-xs text-stone-400 italic p-1">
@@ -2253,7 +2447,7 @@ export const AuthorStudioPage: React.FC<AuthorStudioPageProps> = ({
                             <Tag className="w-3.5 h-3.5 text-pink-500 absolute left-3 top-1/2 -translate-y-1/2" />
                             <input
                               type="text"
-                              placeholder="Nhập tên thể loại / thẻ mới cần thêm (Ví dụ: Thanh xuân, Chữa lành, Showbiz...)..."
+                              placeholder="Nhập thẻ mới (VD: Thanh xuân, Chữa lành, Showbiz; hỗ trợ nhiều thẻ cách nhau bằng dấu phẩy)..."
                               value={editCustomGenreInput}
                               onChange={(e) => setEditCustomGenreInput(e.target.value)}
                               onKeyDown={(e) => {

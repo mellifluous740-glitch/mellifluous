@@ -29,7 +29,11 @@ const listeners = new Set<Listener>();
 const isUnwantedGenre = (g: unknown): boolean => {
   if (typeof g !== 'string') return true;
   const lower = g.trim().toLowerCase();
-  return lower === 'tất cả các thể loại mùa hè' || lower === 'tất cả thể loại mùa hè';
+  return (
+    lower === 'tất cả các thể loại mùa hè' ||
+    lower === 'tất cả thể loại mùa hè' ||
+    lower === 'mùa hè'
+  );
 };
 
 let cachedGenres: string[] = (() => {

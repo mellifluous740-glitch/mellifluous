@@ -168,18 +168,11 @@ export function formatRichTextToHtml(raw?: string | null, indentParagraphs = fal
   text = text.replace(/\[\/?(?:center|right|left|justify|indent|quote|heading|h[1-6]|b|i|u|s|mark|ruby|rt|size|sup|sub)\]/gi, '');
 
   // 5. Structure paragraphs and line breaks:
-  // If the content is already fully wrapped in HTML blocks (<p>, <div, <blockquote, <h[1-6]), preserve it and inject invisible watermarks.
+  // If the content is already fully wrapped in HTML blocks (<p>, <div, <blockquote, <h[1-6]), preserve it cleanly.
   const hasHtmlBlocks = /^<(?:p|div|blockquote|h[1-6]|ul|ol|table)[\s>]/i.test(text.trim());
 
   if (hasHtmlBlocks) {
-    let pCount = 0;
-    return text.replace(/<\/p>/gi, (match) => {
-      pCount++;
-      if (pCount % 4 === 0) {
-        return '<span class="anti-bot-watermark" aria-hidden="true" style="display:none!important;font-size:0;line-height:0;height:0;width:0;opacity:0;overflow:hidden;position:absolute;">[Bản dịch độc quyền thuộc sở hữu của Mellifluous - better and better. Nghiêm cấm sao chép, reup!]</span>' + match;
-      }
-      return match;
-    });
+    return text;
   }
 
   // Otherwise, split by double newlines into paragraphs

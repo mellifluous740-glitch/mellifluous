@@ -691,7 +691,7 @@ export default function App() {
                                       ? 'Thư đã hoàn thành'
                                       : storyFilter === 'ongoing'
                                       ? 'Thư đang viết'
-                                      : 'Danh sách tác phẩm ngôn tình mùa hè'}
+                                      : 'Danh sách tác phẩm ngôn tình'}
                                   </h2>
                                 </div>
 

@@ -114,10 +114,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Synchronize incoming value with visual editor
   useEffect(() => {
     if (editorMode === 'visual' && editorRef.current) {
-      // If the incoming value has BBCode tags or raw markdown, convert to HTML for visual display
-      const currentInner = editorRef.current.innerHTML;
-      if (value !== lastHtmlRef.current && value !== currentInner) {
-        // Convert any BBCode or raw text into formatted HTML for the visual editor
+      const currentInner = editorRef.current.innerHTML.trim();
+      // If innerHTML is empty but we have an incoming value
+      if (!currentInner && value && value.trim()) {
+        const formatted = formatRichTextToHtml(value, false);
+        editorRef.current.innerHTML = formatted || '';
+        lastHtmlRef.current = value;
+      } else if (value !== lastHtmlRef.current && value !== currentInner) {
         const formatted = formatRichTextToHtml(value, false);
         editorRef.current.innerHTML = formatted || '';
         lastHtmlRef.current = value;
@@ -288,12 +291,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleModeSwitch = (mode: 'visual' | 'source' | 'preview') => {
     if (mode === 'visual' && editorMode === 'source') {
       // Synchronize from textarea to visual
-      if (textareaRef.current && editorRef.current) {
+      if (textareaRef.current) {
         const textVal = textareaRef.current.value;
         const formatted = formatRichTextToHtml(textVal, false);
-        editorRef.current.innerHTML = formatted || '';
         lastHtmlRef.current = textVal;
         onChange(textVal);
+        setTimeout(() => {
+          if (editorRef.current) {
+            editorRef.current.innerHTML = formatted || '';
+          }
+        }, 0);
       }
     } else if (mode === 'source' && editorMode === 'visual') {
       // Synchronize from visual to textarea
@@ -705,7 +712,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Editor Content Area - Attached directly to toolbar with NO gap */}
           <div
-            className={`w-full relative flex-1 flex flex-col rounded-b-2xl overflow-hidden ${
+            onClick={() => {
+              if (editorMode === 'visual' && editorRef.current && document.activeElement !== editorRef.current) {
+                editorRef.current.focus();
+              }
+            }}
+            className={`w-full relative flex-1 flex flex-col rounded-b-2xl overflow-hidden cursor-text ${
               isFullscreen ? 'h-full overflow-hidden' : ''
             }`}
           >
