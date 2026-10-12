@@ -419,7 +419,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <span>Quản trị</span>
                       </div>
                       <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
-                        Đăng truyện, sửa chương, quản lý nhạc & thẻ
+                        Quản lý trang web
                       </div>
                     </div>
                   </button>
